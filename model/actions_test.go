@@ -20,7 +20,7 @@ func TestActionNames(t *testing.T) {
 func TestActionNeedsCriteria(t *testing.T) {
 	for _, action := range strings.Split(ActionNames(), "|") {
 		t.Run(action, func(t *testing.T) {
-			assert.Equalf(t, action != "AFTER_BUILD_INFO_SAVE" && action != "GENERIC_EVENT", ActionNeedsCriteria(action), "ActionNeedsCriteria(%v)", action)
+			assert.Equalf(t, action != "AFTER_BUILD_INFO_SAVE" && action != "GENERIC_EVENT" && action != "BEFORE_CREATE_TOKEN", ActionNeedsCriteria(action), "ActionNeedsCriteria(%v)", action)
 		})
 	}
 }
