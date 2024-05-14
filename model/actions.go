@@ -14,16 +14,18 @@ const (
 	ActionAfterBuildInfoSave = "AFTER_BUILD_INFO_SAVE"
 	ActionAfterMove          = "AFTER_MOVE"
 	ActionGenericEvent       = "GENERIC_EVENT"
+	ActionBeforeCreateToken  = "BEFORE_CREATE_TOKEN"
 )
 
 var (
-	actionsNames        = fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s", ActionBeforeDownload, ActionAfterDownload, ActionBeforeUpload, ActionAfterCreate, ActionAfterBuildInfoSave, ActionAfterMove, ActionGenericEvent)
+	actionsNames        = fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s|%s", ActionBeforeDownload, ActionAfterDownload, ActionBeforeUpload, ActionAfterCreate, ActionAfterBuildInfoSave, ActionAfterMove, ActionGenericEvent, ActionBeforeCreateToken)
 	actionsNamesPattern = regexp.MustCompile("(" + actionsNames + ")")
 )
 
 var actionsWithoutCriteria = map[string]any{
 	ActionAfterBuildInfoSave: struct{}{},
 	ActionGenericEvent:       struct{}{},
+	ActionBeforeCreateToken:  struct{}{},
 }
 
 func ActionNames() string {

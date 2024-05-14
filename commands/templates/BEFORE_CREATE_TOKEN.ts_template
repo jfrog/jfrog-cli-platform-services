@@ -1,0 +1,30 @@
+import { PlatformContext, BeforeCreateTokenRequest, BeforeCreateTokenResponse, CreateTokenStatus } from 'jfrog-workers';
+
+export default async (context: PlatformContext, data: BeforeCreateTokenRequest): Promise<BeforeCreateTokenResponse> => {
+
+    let status: CreateTokenStatus = CreateTokenStatus.CREATE_TOKEN_UNSPECIFIED;
+
+    try {
+        // The in-browser HTTP client facilitates making calls to the JFrog REST APIs
+        //To call an external endpoint, use 'await context.clients.axios.get("https://foo.com")'
+        const res = await context.clients.platformHttp.get('/artifactory/api/v1/system/readiness');
+
+        // You should reach this part if the HTTP request status is successful (HTTP Status 399 or lower)
+        if (res.status === 200) {
+            status = CreateTokenStatus.CREATE_TOKEN_PROCEED;
+            console.log("Artifactory ping success");
+        } else {
+            status = CreateTokenStatus.CREATE_TOKEN_WARN;
+            console.warn(`Request is successful but returned status other than 200. Status code : ${ res.status }`);
+        }
+    } catch(error) {
+        // The platformHttp client throws PlatformHttpClientError if the HTTP request status is 400 or higher
+        status = CreateTokenStatus.CREATE_TOKEN_STOP;
+        console.error(`Request failed with status code ${ error.status || '<none>' } caused by : ${ error.message }`)
+    }
+
+    return {
+        status,
+        message: 'Overwritten by worker-service if an error occurs.',
+    }
+};
