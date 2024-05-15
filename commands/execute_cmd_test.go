@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/jfrog/workers-cli/model"
+	"github.com/jfrog/jfrog-cli-platform-services/model"
 )
 
 type executeAssertFunc func(t *testing.T, stdOutput []byte, err error, serverBehavior *executeServerStubBehavior)

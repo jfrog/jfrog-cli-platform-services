@@ -12,7 +12,7 @@ import (
 	"github.com/jfrog/jfrog-cli-core/v2/plugins/components"
 	"github.com/jfrog/jfrog-client-go/utils/log"
 
-	"github.com/jfrog/workers-cli/model"
+	"github.com/jfrog/jfrog-cli-platform-services/model"
 )
 
 type getAllResponse struct {

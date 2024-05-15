@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/jfrog/workers-cli/model"
+	"github.com/jfrog/jfrog-cli-platform-services/model"
 )
 
 type addSecretAssertFunc func(t *testing.T, manifestBefore, manifestAfter *model.Manifest)

@@ -14,7 +14,7 @@ Welcome to the contribution guide for our project! We appreciate your interest i
 To run a command locally, use the following command template:
 
 ```sh
-go run github.com/jfrog/workers-cli command [options] [arguments...]
+go run github.com/jfrog/jfrog-cli-platform-services command [options] [arguments...]
 ```
 
 ---
