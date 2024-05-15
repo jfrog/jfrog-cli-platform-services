@@ -1,4 +1,4 @@
-module github.com/jfrog/workers-cli
+module github.com/jfrog/jfrog-cli-platform-services
 
 require (
 	github.com/jfrog/jfrog-cli-core/v2 v2.51.0

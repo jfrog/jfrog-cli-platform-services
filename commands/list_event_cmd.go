@@ -6,7 +6,7 @@ import (
 	plugins_common "github.com/jfrog/jfrog-cli-core/v2/plugins/common"
 	"github.com/jfrog/jfrog-cli-core/v2/plugins/components"
 
-	"github.com/jfrog/workers-cli/model"
+	"github.com/jfrog/jfrog-cli-platform-services/model"
 )
 
 func GetListEventsCommand() components.Command {

@@ -9,7 +9,7 @@ import (
 	"github.com/jfrog/jfrog-cli-core/v2/utils/ioutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
 
-	"github.com/jfrog/workers-cli/model"
+	"github.com/jfrog/jfrog-cli-platform-services/model"
 )
 
 type addSecretCommand struct {
