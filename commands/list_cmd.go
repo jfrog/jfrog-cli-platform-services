@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 
 	plugins_common "github.com/jfrog/jfrog-cli-core/v2/plugins/common"
@@ -85,6 +86,10 @@ func formatListResponseAsCsv(res *http.Response, okStatus int) error {
 			}
 
 			writer := csv.NewWriter(cliOut)
+
+			slices.SortFunc(allWorkers.Workers, func(a, b *model.WorkerDetails) int {
+				return strings.Compare(a.Key, b.Key)
+			})
 
 			for _, wk := range allWorkers.Workers {
 				err = writer.Write([]string{
