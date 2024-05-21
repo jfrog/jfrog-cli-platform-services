@@ -6,5 +6,5 @@ import (
 )
 
 func main() {
-	plugins.PluginMain(cli.GetWorkerApp())
+	plugins.PluginMain(cli.GetPlatformServicesApp())
 }
