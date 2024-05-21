@@ -5,24 +5,30 @@ import (
 	"github.com/jfrog/jfrog-cli-platform-services/commands"
 )
 
-func GetWorkerApp() components.App {
-	app := components.App{}
-	app.Name = "worker"
-	app.Description = "Tools for managing workers"
-	app.Version = "v1.0.0"
-	app.Commands = getWorkerCommands()
-	return app
+const category = "Platform Services"
+
+func GetPlatformServicesApp() components.App {
+	return components.CreateEmbeddedApp(
+		category,
+		nil,
+		getWorkerNamespace(),
+	)
 }
 
-func getWorkerCommands() []components.Command {
-	return []components.Command{
-		commands.GetInitCommand(),
-		commands.GetDryRunCommand(),
-		commands.GetDeployCommand(),
-		commands.GetExecuteCommand(),
-		commands.GetRemoveCommand(),
-		commands.GetListCommand(),
-		commands.GetAddSecretCommand(),
-		commands.GetListEventsCommand(),
+func getWorkerNamespace() components.Namespace {
+	return components.Namespace{
+		Name:        "worker",
+		Description: "Tools for managing workers",
+		Category:    category,
+		Commands: []components.Command{
+			commands.GetInitCommand(),
+			commands.GetDryRunCommand(),
+			commands.GetDeployCommand(),
+			commands.GetExecuteCommand(),
+			commands.GetRemoveCommand(),
+			commands.GetListCommand(),
+			commands.GetAddSecretCommand(),
+			commands.GetListEventsCommand(),
+		},
 	}
 }

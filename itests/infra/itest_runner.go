@@ -46,7 +46,7 @@ type Test struct {
 	t           *testing.T
 }
 
-var runPlugin = plugins.RunCliWithPlugin(cli.GetWorkerApp())
+var runPlugin = plugins.RunCliWithPlugin(cli.GetPlatformServicesApp())
 
 func RunITests(tests []TestDefinition, t *testing.T) {
 	if testing.Short() {

@@ -1,6 +1,7 @@
 module github.com/jfrog/jfrog-cli-platform-services
 
 require (
+	github.com/google/uuid v1.6.0
 	github.com/jfrog/jfrog-cli-core/v2 v2.51.0
 	github.com/jfrog/jfrog-client-go v1.40.1
 	github.com/stretchr/testify v1.9.0
@@ -31,7 +32,6 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/snappy v0.0.4 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/gookit/color v1.5.4 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
