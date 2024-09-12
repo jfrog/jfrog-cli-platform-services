@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
-	"regexp"
 	"strings"
 
 	"github.com/jfrog/jfrog-cli-core/v2/utils/coreutils"
@@ -23,9 +23,8 @@ import (
 
 // Useful to capture output in tests
 var (
-	cliOut        io.Writer = os.Stdout
-	cliIn         io.Reader = os.Stdin
-	importPattern           = regexp.MustCompile(`(?ms)^\s*(import\s+[^;]+;\s*)(.*)$`)
+	cliOut io.Writer = os.Stdout
+	cliIn  io.Reader = os.Stdin
 )
 
 func prettifyJson(in []byte) []byte {
@@ -55,6 +54,48 @@ func outputApiResponse(res *http.Response, okStatus int) error {
 
 		return err
 	})
+}
+
+type stringFlagAware interface {
+	GetStringFlagValue(string) string
+}
+
+// Extracts the project key and worker key from the command context. If the project key is not provided, it will be taken from the manifest.
+// There workerKey could either be the first argument or the name in the manifest.
+// The first argument will only be considered as the workerKey if total arguments are greater than minArgument.
+func extractProjectAndKeyFromCommandContext(c stringFlagAware, args []string, minArguments int, onlyGeneric bool) (string, string, error) {
+	var workerKey string
+
+	projectKey := c.GetStringFlagValue(model.FlagProjectKey)
+
+	if len(args) > 0 && len(args) > minArguments {
+		workerKey = args[0]
+	}
+
+	if workerKey == "" || projectKey == "" {
+		manifest, err := model.ReadManifest()
+		if err != nil {
+			return "", "", err
+		}
+
+		if err = manifest.Validate(); err != nil {
+			return "", "", err
+		}
+
+		if onlyGeneric && manifest.Action != "GENERIC_EVENT" {
+			return "", "", fmt.Errorf("only the GENERIC_EVENT actions are executable. Got %s", manifest.Action)
+		}
+
+		if workerKey == "" {
+			workerKey = manifest.Name
+		}
+
+		if projectKey == "" {
+			projectKey = manifest.ProjectKey
+		}
+	}
+
+	return workerKey, projectKey, nil
 }
 
 func discardApiResponse(res *http.Response, okStatus int) error {
@@ -93,13 +134,26 @@ func processApiResponse(res *http.Response, doWithContent func(content []byte, s
 	return doWithContent(responseBytes, res.StatusCode)
 }
 
-func callWorkerApi(c *components.Context, serverUrl string, serverToken string, method string, body []byte, api ...string) (*http.Response, func(), error) {
+func callWorkerApi(c *components.Context, serverUrl string, serverToken string, method string, body []byte, queryParams map[string]string, api ...string) (*http.Response, func(), error) {
 	timeout, err := model.GetTimeoutParameter(c)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	url := fmt.Sprintf("%sworker/api/v1/%s", utils.AddTrailingSlashIfNeeded(serverUrl), strings.Join(api, "/"))
+	apiEndpoint := fmt.Sprintf("%sworker/api/v1/%s", utils.AddTrailingSlashIfNeeded(serverUrl), strings.Join(api, "/"))
+
+	if queryParams != nil {
+		var query string
+		for key, value := range queryParams {
+			if query != "" {
+				query += "&"
+			}
+			query += fmt.Sprintf("%s=%s", key, url.QueryEscape(value))
+		}
+		if query != "" {
+			apiEndpoint += "?" + query
+		}
+	}
 
 	reqCtx, cancelReq := context.WithTimeout(context.Background(), timeout)
 
@@ -108,7 +162,7 @@ func callWorkerApi(c *components.Context, serverUrl string, serverToken string, 
 		bodyReader = bytes.NewBuffer(body)
 	}
 
-	req, err := http.NewRequestWithContext(reqCtx, method, url, bodyReader)
+	req, err := http.NewRequestWithContext(reqCtx, method, apiEndpoint, bodyReader)
 	if err != nil {
 		return nil, cancelReq, err
 	}
@@ -128,8 +182,8 @@ func callWorkerApi(c *components.Context, serverUrl string, serverToken string, 
 	return res, cancelReq, nil
 }
 
-func callWorkerApiWithOutput(c *components.Context, serverUrl string, serverToken string, method string, body []byte, okStatus int, api ...string) error {
-	res, discardReq, err := callWorkerApi(c, serverUrl, serverToken, method, body, api...)
+func callWorkerApiWithOutput(c *components.Context, serverUrl string, serverToken string, method string, body []byte, okStatus int, queryParams map[string]string, api ...string) error {
+	res, discardReq, err := callWorkerApi(c, serverUrl, serverToken, method, body, queryParams, api...)
 	if discardReq != nil {
 		defer discardReq()
 	}
@@ -139,8 +193,8 @@ func callWorkerApiWithOutput(c *components.Context, serverUrl string, serverToke
 	return outputApiResponse(res, okStatus)
 }
 
-func callWorkerApiSilent(c *components.Context, serverUrl string, serverToken string, method string, body []byte, okStatus int, api ...string) error {
-	res, discardReq, err := callWorkerApi(c, serverUrl, serverToken, method, body, api...)
+func callWorkerApiSilent(c *components.Context, serverUrl string, serverToken string, method string, body []byte, okStatus int, queryParams map[string]string, api ...string) error {
+	res, discardReq, err := callWorkerApi(c, serverUrl, serverToken, method, body, queryParams, api...)
 	if discardReq != nil {
 		defer discardReq()
 	}
@@ -151,8 +205,13 @@ func callWorkerApiSilent(c *components.Context, serverUrl string, serverToken st
 }
 
 // fetchWorkerDetails Fetch a worker by its name. Returns nil if the worker does not exist (statusCode=404). Any other statusCode other than 200 will result as an error.
-func fetchWorkerDetails(c *components.Context, serverUrl string, accessToken string, workerKey string) (*model.WorkerDetails, error) {
-	res, discardReq, err := callWorkerApi(c, serverUrl, accessToken, http.MethodGet, nil, "workers", workerKey)
+func fetchWorkerDetails(c *components.Context, serverUrl string, accessToken string, workerKey string, projectKey string) (*model.WorkerDetails, error) {
+	queryParams := make(map[string]string)
+	if projectKey != "" {
+		queryParams["projectKey"] = projectKey
+	}
+
+	res, discardReq, err := callWorkerApi(c, serverUrl, accessToken, http.MethodGet, nil, queryParams, "workers", workerKey)
 	if discardReq != nil {
 		defer discardReq()
 	}
@@ -211,14 +270,4 @@ func prepareSecretsUpdate(mf *model.Manifest, existingWorker *model.WorkerDetail
 	}
 
 	return secrets
-}
-
-func cleanImports(source string) string {
-	out := source
-	match := importPattern.FindAllStringSubmatch(out, -1)
-	for len(match) == 1 && len(match[0]) == 3 {
-		out = match[0][2]
-		match = importPattern.FindAllStringSubmatch(out, -1)
-	}
-	return out
 }

@@ -17,13 +17,22 @@ func GetListEventsCommand() components.Command {
 		Flags: []components.Flag{
 			plugins_common.GetServerIdFlag(),
 			model.GetTimeoutFlag(),
+			model.GetProjectKeyFlag(),
 		},
 		Action: func(c *components.Context) error {
 			server, err := model.GetServerDetails(c)
 			if err != nil {
 				return err
 			}
-			return callWorkerApiWithOutput(c, server.GetUrl(), server.GetAccessToken(), http.MethodGet, nil, http.StatusOK, "actions")
+
+			projectKey := c.GetStringFlagValue(model.FlagProjectKey)
+
+			var queryParams map[string]string
+			if projectKey != "" {
+				queryParams = map[string]string{"projectKey": projectKey}
+			}
+
+			return callWorkerApiWithOutput(c, server.GetUrl(), server.GetAccessToken(), http.MethodGet, nil, http.StatusOK, queryParams, "actions")
 		},
 	}
 }

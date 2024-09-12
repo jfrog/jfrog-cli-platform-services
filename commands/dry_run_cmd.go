@@ -25,9 +25,9 @@ type dryRunRequest struct {
 
 func GetDryRunCommand() components.Command {
 	return components.Command{
-		Name:        "dry-run",
+		Name:        "test-run",
 		Description: "Dry run a worker",
-		Aliases:     []string{"dr"},
+		Aliases:     []string{"dry-run", "dr", "tr"},
 		Flags: []components.Flag{
 			plugins_common.GetServerIdFlag(),
 			model.GetTimeoutFlag(),
@@ -76,7 +76,8 @@ func (c *dryRunHandler) run(manifest *model.Manifest, serverUrl string, token st
 	if err != nil {
 		return err
 	}
-	return callWorkerApiWithOutput(c.ctx, serverUrl, token, http.MethodPost, body, http.StatusOK, "test", manifest.Name)
+	queryParams := c.prepareQueryParams(manifest)
+	return callWorkerApiWithOutput(c.ctx, serverUrl, token, http.MethodPost, body, http.StatusOK, queryParams, "test", manifest.Name)
 }
 
 func (c *dryRunHandler) preparePayload(manifest *model.Manifest, serverUrl string, token string, data map[string]any) ([]byte, error) {
@@ -88,9 +89,9 @@ func (c *dryRunHandler) preparePayload(manifest *model.Manifest, serverUrl strin
 	if err != nil {
 		return nil, err
 	}
-	payload.Code = cleanImports(payload.Code)
+	payload.Code = model.CleanImports(payload.Code)
 
-	existingWorker, err := fetchWorkerDetails(c.ctx, serverUrl, token, manifest.Name)
+	existingWorker, err := fetchWorkerDetails(c.ctx, serverUrl, token, manifest.Name, manifest.ProjectKey)
 	if err != nil {
 		log.Warn(err.Error())
 	}
@@ -100,4 +101,18 @@ func (c *dryRunHandler) preparePayload(manifest *model.Manifest, serverUrl strin
 	}
 
 	return json.Marshal(&payload)
+}
+
+func (c *dryRunHandler) prepareQueryParams(manifest *model.Manifest) map[string]string {
+	queryParams := make(map[string]string)
+
+	if manifest.ProjectKey != "" {
+		queryParams["projectKey"] = manifest.ProjectKey
+	}
+
+	if manifest.Debug {
+		queryParams["debug"] = "true"
+	}
+
+	return queryParams
 }

@@ -6,19 +6,20 @@ import (
 )
 
 const (
-	ActionUnspecified        = "ACTION_UNSPECIFIED"
-	ActionBeforeDownload     = "BEFORE_DOWNLOAD"
-	ActionAfterDownload      = "AFTER_DOWNLOAD"
-	ActionBeforeUpload       = "BEFORE_UPLOAD"
-	ActionAfterCreate        = "AFTER_CREATE"
-	ActionAfterBuildInfoSave = "AFTER_BUILD_INFO_SAVE"
-	ActionAfterMove          = "AFTER_MOVE"
-	ActionGenericEvent       = "GENERIC_EVENT"
-	ActionBeforeCreateToken  = "BEFORE_CREATE_TOKEN"
+	ActionUnspecified          = "ACTION_UNSPECIFIED"
+	ActionBeforeDownload       = "BEFORE_DOWNLOAD"
+	ActionAfterDownload        = "AFTER_DOWNLOAD"
+	ActionBeforeUpload         = "BEFORE_UPLOAD"
+	ActionAfterCreate          = "AFTER_CREATE"
+	ActionAfterBuildInfoSave   = "AFTER_BUILD_INFO_SAVE"
+	ActionAfterMove            = "AFTER_MOVE"
+	ActionGenericEvent         = "GENERIC_EVENT"
+	ActionBeforeCreateToken    = "BEFORE_CREATE_TOKEN"
+	ActionBeforePropertyCreate = "BEFORE_PROPERTY_CREATE"
 )
 
 var (
-	actionsNames        = fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s|%s", ActionBeforeDownload, ActionAfterDownload, ActionBeforeUpload, ActionAfterCreate, ActionAfterBuildInfoSave, ActionAfterMove, ActionGenericEvent, ActionBeforeCreateToken)
+	actionsNames        = fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s|%s|%s", ActionBeforeDownload, ActionAfterDownload, ActionBeforeUpload, ActionAfterCreate, ActionAfterBuildInfoSave, ActionAfterMove, ActionGenericEvent, ActionBeforeCreateToken, ActionBeforePropertyCreate)
 	actionsNamesPattern = regexp.MustCompile("(" + actionsNames + ")")
 )
 

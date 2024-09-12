@@ -97,6 +97,13 @@ func TestListCommand(t *testing.T) {
 			},
 		},
 		{
+			name:        "projectKey is passed to the request",
+			commandArgs: []string{"--" + model.FlagProjectKey, "my-project"},
+			serverBehavior: listServerStubBehavior{
+				wantProjectKey: "my-project",
+			},
+		},
+		{
 			name:        "fails if timeout exceeds",
 			commandArgs: []string{"--" + model.FlagTimeout, "500"},
 			serverBehavior: listServerStubBehavior{
@@ -167,6 +174,7 @@ type listServerStubBehavior struct {
 	responseStatus  int
 	wantBearerToken string
 	wantAction      string
+	wantProjectKey  string
 	existingWorkers []*model.WorkerDetails
 }
 
@@ -209,6 +217,14 @@ func (s *listServerStub) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	if req.Header.Get("authorization") != "Bearer "+s.behavior.wantBearerToken {
 		res.WriteHeader(http.StatusForbidden)
 		return
+	}
+
+	// Validate request params
+	if s.behavior.wantProjectKey != "" {
+		if req.URL.Query().Get("projectKey") != s.behavior.wantProjectKey {
+			res.WriteHeader(http.StatusBadRequest)
+			return
+		}
 	}
 
 	if s.behavior.responseStatus > 0 {

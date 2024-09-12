@@ -6,8 +6,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/jfrog/jfrog-cli-platform-services/cli"
-	"github.com/jfrog/jfrog-cli-platform-services/model"
 	"net/http"
 	"os"
 	"path"
@@ -15,6 +13,8 @@ import (
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/jfrog/jfrog-cli-platform-services/model"
 
 	"github.com/google/uuid"
 	coreCommans "github.com/jfrog/jfrog-cli-core/v2/common/commands"
@@ -46,7 +46,9 @@ type Test struct {
 	t           *testing.T
 }
 
-var runPlugin = plugins.RunCliWithPlugin(cli.GetPlatformServicesApp())
+const requestTimeout = 5 * time.Second
+
+var runPlugin = plugins.RunCliWithPlugin(getApp())
 
 func RunITests(tests []TestDefinition, t *testing.T) {
 	if testing.Short() {
@@ -78,7 +80,6 @@ func RunITests(tests []TestDefinition, t *testing.T) {
 }
 
 func runTest(t *testing.T, testSpec TestDefinition) {
-
 	homeDir := createTestHomeDir(t)
 
 	// Setup cli home for tests
@@ -190,7 +191,7 @@ func (it *Test) CapturedOutput() []byte {
 }
 
 func (it *Test) GetAllWorkers() []*model.WorkerDetails {
-	ctx, cancelCtx := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancelCtx := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancelCtx()
 
 	response := struct {
@@ -207,8 +208,10 @@ func (it *Test) GetAllWorkers() []*model.WorkerDetails {
 }
 
 func (it *Test) CreateWorker(createRequest *model.WorkerDetails) {
-	ctx, cancelCtx := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancelCtx := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancelCtx()
+
+	it.Logf("Adding worker %s", createRequest.Key)
 
 	jsonBytes, err := json.Marshal(createRequest)
 	require.NoError(it, err)
@@ -222,7 +225,7 @@ func (it *Test) CreateWorker(createRequest *model.WorkerDetails) {
 }
 
 func (it *Test) DeleteWorker(workerKey string) {
-	ctx, cancelCtx := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancelCtx := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancelCtx()
 
 	it.Logf("Deleting worker '%s'", workerKey)

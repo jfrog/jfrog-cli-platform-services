@@ -16,10 +16,12 @@ type deployRequest struct {
 	Key            string               `json:"key"`
 	Description    string               `json:"description"`
 	Enabled        bool                 `json:"enabled"`
+	Debug          bool                 `json:"debug"`
 	SourceCode     string               `json:"sourceCode"`
 	Action         string               `json:"action"`
 	FilterCriteria model.FilterCriteria `json:"filterCriteria,omitempty"`
 	Secrets        []*model.Secret      `json:"secrets"`
+	ProjectKey     string               `json:"projectKey"`
 }
 
 func GetDeployCommand() components.Command {
@@ -59,7 +61,7 @@ func GetDeployCommand() components.Command {
 }
 
 func runDeployCommand(ctx *components.Context, manifest *model.Manifest, serverUrl string, token string) error {
-	existingWorker, err := fetchWorkerDetails(ctx, serverUrl, token, manifest.Name)
+	existingWorker, err := fetchWorkerDetails(ctx, serverUrl, token, manifest.Name, manifest.ProjectKey)
 	if err != nil {
 		return err
 	}
@@ -76,7 +78,7 @@ func runDeployCommand(ctx *components.Context, manifest *model.Manifest, serverU
 
 	if existingWorker == nil {
 		log.Info(fmt.Sprintf("Deploying worker '%s'", manifest.Name))
-		err = callWorkerApiWithOutput(ctx, serverUrl, token, http.MethodPost, bodyBytes, http.StatusCreated, "workers")
+		err = callWorkerApiWithOutput(ctx, serverUrl, token, http.MethodPost, bodyBytes, http.StatusCreated, nil, "workers")
 		if err == nil {
 			log.Info(fmt.Sprintf("Worker '%s' deployed", manifest.Name))
 		}
@@ -84,7 +86,7 @@ func runDeployCommand(ctx *components.Context, manifest *model.Manifest, serverU
 	}
 
 	log.Info(fmt.Sprintf("Updating worker '%s'", manifest.Name))
-	err = callWorkerApiWithOutput(ctx, serverUrl, token, http.MethodPut, bodyBytes, http.StatusNoContent, "workers")
+	err = callWorkerApiWithOutput(ctx, serverUrl, token, http.MethodPut, bodyBytes, http.StatusNoContent, nil, "workers")
 	if err == nil {
 		log.Info(fmt.Sprintf("Worker '%s' updated", manifest.Name))
 	}
@@ -97,7 +99,7 @@ func prepareDeployRequest(ctx *components.Context, manifest *model.Manifest, exi
 	if err != nil {
 		return nil, err
 	}
-	sourceCode = cleanImports(sourceCode)
+	sourceCode = model.CleanImports(sourceCode)
 
 	var secrets []*model.Secret
 
@@ -110,9 +112,11 @@ func prepareDeployRequest(ctx *components.Context, manifest *model.Manifest, exi
 		Action:         manifest.Action,
 		Description:    manifest.Description,
 		Enabled:        manifest.Enabled,
+		Debug:          manifest.Debug,
 		FilterCriteria: manifest.FilterCriteria,
 		SourceCode:     sourceCode,
 		Secrets:        secrets,
+		ProjectKey:     manifest.ProjectKey,
 	}
 
 	return payload, nil

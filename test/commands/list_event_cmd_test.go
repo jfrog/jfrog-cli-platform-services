@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/jfrog/jfrog-cli-platform-services/itests/infra"
+	"github.com/jfrog/jfrog-cli-platform-services/test/infra"
 )
 
 type listEventTestCase struct {
@@ -41,7 +41,7 @@ func listEventTestSpec(tc listEventTestCase) infra.TestDefinition {
 		Skip:          tc.skip,
 		CaptureOutput: true,
 		Test: func(it *infra.Test) {
-			cmd := append([]string{"worker", "list-event"}, tc.commandArgs...)
+			cmd := append([]string{infra.AppName, "list-event"}, tc.commandArgs...)
 
 			err := it.RunCommand(cmd...)
 

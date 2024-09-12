@@ -23,7 +23,7 @@ func TestRemoveCommand(t *testing.T) {
 		token          string
 		workerAction   string
 		workerName     string
-		skipInit       bool
+		patchManifest  func(mf *model.Manifest)
 		serverBehavior removeServerStubBehavior
 		wantErr        error
 	}{
@@ -38,7 +38,6 @@ func TestRemoveCommand(t *testing.T) {
 		{
 			name:        "undeploy from key",
 			workerName:  "wk-1",
-			skipInit:    true,
 			commandArgs: []string{"wk-1"},
 			serverBehavior: removeServerStubBehavior{
 				wantWorkerKey: "wk-1",
@@ -71,17 +70,19 @@ func TestRemoveCommand(t *testing.T) {
 				workerName = tt.workerName
 			}
 
-			if !tt.skipInit {
-				workerAction := tt.workerAction
-				if workerAction == "" {
-					workerAction = "BEFORE_DOWNLOAD"
-				}
-
-				err := runCmd("worker", "init", workerAction, workerName)
-				require.NoError(t, err)
+			workerAction := tt.workerAction
+			if workerAction == "" {
+				workerAction = "BEFORE_DOWNLOAD"
 			}
 
-			err := os.Setenv(model.EnvKeyServerUrl, newRemoveServerStub(t, ctx, &tt.serverBehavior))
+			err := runCmd("worker", "init", workerAction, workerName)
+			require.NoError(t, err)
+
+			if tt.patchManifest != nil {
+				patchManifest(t, tt.patchManifest)
+			}
+
+			err = os.Setenv(model.EnvKeyServerUrl, newRemoveServerStub(t, ctx, &tt.serverBehavior))
 			require.NoError(t, err)
 			t.Cleanup(func() {
 				_ = os.Unsetenv(model.EnvKeyServerUrl)
@@ -120,6 +121,7 @@ type removeServerStubBehavior struct {
 	responseStatus  int
 	wantBearerToken string
 	wantWorkerKey   string
+	requestParams   map[string]string
 }
 
 type removeServerStub struct {
@@ -165,6 +167,14 @@ func (s *removeServerStub) ServeHTTP(res http.ResponseWriter, req *http.Request)
 	if req.Header.Get("authorization") != "Bearer "+s.behavior.wantBearerToken {
 		res.WriteHeader(http.StatusForbidden)
 		return
+	}
+
+	// Validate the request params
+	for k, v := range s.behavior.requestParams {
+		if req.URL.Query().Get(k) != v {
+			res.WriteHeader(http.StatusBadRequest)
+			return
+		}
 	}
 
 	if s.behavior.responseStatus > 0 {
