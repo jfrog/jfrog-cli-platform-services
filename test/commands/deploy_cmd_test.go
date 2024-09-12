@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/jfrog/jfrog-cli-platform-services/itests/infra"
 	"github.com/jfrog/jfrog-cli-platform-services/model"
+	"github.com/jfrog/jfrog-cli-platform-services/test/infra"
 )
 
 type deployTestCase struct {
@@ -92,7 +92,7 @@ func deployTestSpec(tc deployTestCase) infra.TestDefinition {
 				workerName = tc.workerKey
 			}
 
-			err := it.RunCommand("worker", "init", "GENERIC_EVENT", workerName)
+			err := it.RunCommand(infra.AppName, "init", "GENERIC_EVENT", workerName)
 			require.NoError(it, err)
 
 			if tc.patchManifest != nil {
@@ -101,7 +101,7 @@ func deployTestSpec(tc deployTestCase) infra.TestDefinition {
 
 			infra.AddSecretPasswordToEnv(it)
 
-			cmd := append([]string{"worker", "deploy"}, tc.commandArgs...)
+			cmd := append([]string{infra.AppName, "deploy"}, tc.commandArgs...)
 
 			err = it.RunCommand(cmd...)
 
@@ -148,7 +148,7 @@ func assertWorkerDeployed(it *infra.Test, mf *model.Manifest) {
 
 	sourceCode, err := mf.ReadSourceCode()
 	require.NoError(it, err)
-	assert.Equalf(it, sourceCode, deployed.SourceCode, "SourceCode mismatch")
+	assert.Equalf(it, model.CleanImports(sourceCode), deployed.SourceCode, "SourceCode mismatch")
 
 	require.Equalf(it, len(mf.Secrets), len(deployed.Secrets), "Secrets length mismatch")
 	for _, deployedSecret := range deployed.Secrets {

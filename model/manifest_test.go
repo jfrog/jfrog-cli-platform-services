@@ -18,6 +18,8 @@ var manifestSample = &Manifest{
 	SourceCodePath: "./my-worker.ts",
 	Action:         "BEFORE_DOWNLOAD",
 	Enabled:        true,
+	Debug:          true,
+	ProjectKey:     "a-project",
 	Secrets: Secrets{
 		"hidden1": "hidden1.value",
 		"hidden2": "hidden2.value",

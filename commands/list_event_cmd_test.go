@@ -46,6 +46,13 @@ func TestListEventCommand(t *testing.T) {
 			},
 			wantErr: errors.New("request timed out after 500ms"),
 		},
+		{
+			name:        "should propagate projectKey",
+			commandArgs: []string{"wk-1", "--" + model.FlagProjectKey, "proj-1"},
+			serverBehavior: listEventServerStubBehavior{
+				wantProjectKey: "proj-1",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -103,6 +110,7 @@ type listEventServerStubBehavior struct {
 	waitFor         time.Duration
 	responseStatus  int
 	wantBearerToken string
+	wantProjectKey  string
 	events          []string
 }
 
@@ -145,6 +153,16 @@ func (s *listEventServerStub) ServeHTTP(res http.ResponseWriter, req *http.Reque
 	if req.Header.Get("authorization") != "Bearer "+s.behavior.wantBearerToken {
 		res.WriteHeader(http.StatusForbidden)
 		return
+	}
+
+	// Validate the projectKey
+	if s.behavior.wantProjectKey != "" {
+		gotProjectKey := req.URL.Query().Get("projectKey")
+		if gotProjectKey != s.behavior.wantProjectKey {
+			s.t.Logf("Invalid projectKey want='%s', got='%s'", s.behavior.wantProjectKey, gotProjectKey)
+			res.WriteHeader(http.StatusBadRequest)
+			return
+		}
 	}
 
 	if s.behavior.responseStatus > 0 {

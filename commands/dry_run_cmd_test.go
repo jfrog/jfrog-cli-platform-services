@@ -24,11 +24,14 @@ type dryRunAssertFunc func(t *testing.T, stdOutput []byte, err error, serverBeha
 
 func TestDryRun(t *testing.T) {
 	tests := []struct {
-		name        string
-		commandArgs []string
-		assert      dryRunAssertFunc
+		name          string
+		commandArgs   []string
+		assert        dryRunAssertFunc
+		patchManifest func(mf *model.Manifest)
 		// Token to be sent in the request
 		token string
+		// Use this workerKey instead of a random generated one
+		workerKey string
 		// The server behavior
 		serverBehavior *dryRunServerStubBehavior
 		// If provided the cliIn will be filled with this content
@@ -122,6 +125,26 @@ func TestDryRun(t *testing.T) {
 			commandArgs: []string{"@"},
 			assert:      assertDryRunFail("missing file path"),
 		},
+		{
+			name:      "should propagate projectKey",
+			workerKey: "my-worker",
+			token:     "valid-token",
+			serverBehavior: &dryRunServerStubBehavior{
+				requestToken: "valid-token",
+				requestParams: map[string]string{
+					"projectKey": "my-project",
+				},
+				responseBody:   map[string]any{"valid": "response"},
+				responseStatus: http.StatusOK,
+			},
+			commandArgs: []string{"-"},
+			stdInput:    `{}`,
+			patchManifest: func(mf *model.Manifest) {
+				mf.ProjectKey = "my-project"
+				mf.Name = "my-worker"
+			},
+			assert: assertDryRunSucceed,
+		},
 	}
 
 	for _, tt := range tests {
@@ -133,12 +156,21 @@ func TestDryRun(t *testing.T) {
 
 			_, workerName := prepareWorkerDirForTest(t)
 
+			if tt.workerKey != "" {
+				workerName = tt.workerKey
+			}
+
 			err := runCmd("worker", "init", "BEFORE_DOWNLOAD", workerName)
 			require.NoError(t, err)
 
+			if tt.patchManifest != nil {
+				patchManifest(t, tt.patchManifest)
+			}
+
 			serverResponseStubs := map[string]*dryRunServerStubBehavior{}
 			if tt.serverBehavior != nil {
-				serverResponseStubs[workerName] = tt.serverBehavior
+				key := workerName
+				serverResponseStubs[key] = tt.serverBehavior
 			}
 
 			err = os.Setenv(model.EnvKeyServerUrl, newDryRunServerStub(t, ctx, serverResponseStubs))
@@ -206,7 +238,7 @@ func assertDryRunFail(errorMessage string, errorMessageArgs ...any) dryRunAssert
 	}
 }
 
-var dryRunUrlPattern = regexp.MustCompile(`^/worker/api/v1/test/([\S/]+)$`)
+var dryRunUrlPattern = regexp.MustCompile(`^/worker/api/v1/test/([^\s?]+)(\?.+)?$`)
 
 type dryRunServerStubBehavior struct {
 	waitFor        time.Duration
@@ -214,6 +246,7 @@ type dryRunServerStubBehavior struct {
 	responseBody   map[string]any
 	requestToken   string
 	requestBody    map[string]any
+	requestParams  map[string]string
 }
 
 type dryRunServerStub struct {
@@ -288,6 +321,14 @@ func (s *dryRunServerStub) ServeHTTP(res http.ResponseWriter, req *http.Request)
 				res.WriteHeader(http.StatusBadRequest)
 				return
 			}
+		}
+	}
+
+	// Validate the request params
+	for k, v := range behavior.requestParams {
+		if req.URL.Query().Get(k) != v {
+			res.WriteHeader(http.StatusBadRequest)
+			return
 		}
 	}
 

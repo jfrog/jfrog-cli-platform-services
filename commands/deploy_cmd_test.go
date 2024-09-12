@@ -40,6 +40,7 @@ func TestDeployCommand(t *testing.T) {
 					t,
 					"wk-0",
 					"BEFORE_UPLOAD",
+					"",
 					&model.Secret{Key: "sec-1", Value: "val-1"},
 					&model.Secret{Key: "sec-2", Value: "val-2"},
 				),
@@ -57,7 +58,7 @@ func TestDeployCommand(t *testing.T) {
 			workerName:   "wk-1",
 			serverBehavior: deployServerStubBehavior{
 				wantMethods:     []string{http.MethodGet, http.MethodPut},
-				wantRequestBody: getExpectedDeployRequestForAction(t, "wk-1", "GENERIC_EVENT"),
+				wantRequestBody: getExpectedDeployRequestForAction(t, "wk-1", "GENERIC_EVENT", ""),
 				existingWorkers: map[string]*model.WorkerDetails{
 					"wk-1": {},
 				},
@@ -68,15 +69,8 @@ func TestDeployCommand(t *testing.T) {
 			workerAction: "AFTER_MOVE",
 			workerName:   "wk-2",
 			serverBehavior: deployServerStubBehavior{
-				wantMethods: []string{http.MethodGet, http.MethodPut},
-				wantRequestBody: getExpectedDeployRequestForAction(
-					t,
-					"wk-2",
-					"AFTER_MOVE",
-					&model.Secret{Key: "sec-1", MarkedForRemoval: true},
-					&model.Secret{Key: "sec-1", Value: "val-1"},
-					&model.Secret{Key: "sec-2", MarkedForRemoval: true},
-				),
+				wantMethods:     []string{http.MethodGet, http.MethodPut},
+				wantRequestBody: getExpectedDeployRequestForAction(t, "wk-2", "AFTER_MOVE", "", &model.Secret{Key: "sec-1", MarkedForRemoval: true}, &model.Secret{Key: "sec-1", Value: "val-1"}, &model.Secret{Key: "sec-2", MarkedForRemoval: true}),
 				existingWorkers: map[string]*model.WorkerDetails{
 					"wk-2": {
 						Secrets: []*model.Secret{
@@ -89,6 +83,18 @@ func TestDeployCommand(t *testing.T) {
 				mf.Secrets = model.Secrets{
 					"sec-1": mustEncryptSecret(t, "val-1"),
 				}
+			},
+		},
+		{
+			name:         "update with project key",
+			workerAction: "GENERIC_EVENT",
+			workerName:   "wk-1",
+			serverBehavior: deployServerStubBehavior{
+				wantMethods:     []string{http.MethodGet, http.MethodPost},
+				wantRequestBody: getExpectedDeployRequestForAction(t, "wk-1", "GENERIC_EVENT", "proj-1"),
+			},
+			patchManifest: func(mf *model.Manifest) {
+				mf.ProjectKey = "proj-1"
 			},
 		},
 		{
@@ -174,6 +180,7 @@ type deployServerStubBehavior struct {
 	waitFor         time.Duration
 	responseStatus  int
 	wantBearerToken string
+	wantProjectKey  string
 	wantRequestBody *deployRequest
 	wantMethods     []string
 	existingWorkers map[string]*model.WorkerDetails
@@ -205,6 +212,16 @@ func (s *deployServerStub) ServeHTTP(res http.ResponseWriter, req *http.Request)
 		case <-s.ctx.Done():
 			return
 		case <-time.After(s.behavior.waitFor):
+		}
+	}
+
+	// Validate the projectKey
+	if s.behavior.wantProjectKey != "" {
+		gotProjectKey := req.URL.Query().Get("projectKey")
+		if gotProjectKey != s.behavior.wantProjectKey {
+			s.t.Logf("Invalid projectKey want='%s', got='%s'", s.behavior.wantProjectKey, gotProjectKey)
+			res.WriteHeader(http.StatusBadRequest)
+			return
 		}
 	}
 
@@ -313,14 +330,15 @@ func assertDeployRequestEquals(t require.TestingT, want, got *deployRequest) {
 	assert.ElementsMatchf(t, wantSecrets, gotSecrets, "Secrets mismatch")
 }
 
-func getExpectedDeployRequestForAction(t require.TestingT, workerName, actionName string, secrets ...*model.Secret) *deployRequest {
+func getExpectedDeployRequestForAction(t require.TestingT, workerName, actionName, projectKey string, secrets ...*model.Secret) *deployRequest {
 	r := &deployRequest{
 		Key:         workerName,
 		Description: "Run a script on " + actionName,
 		Enabled:     false,
-		SourceCode:  cleanImports(getActionSourceCode(t, actionName)),
+		SourceCode:  model.CleanImports(getActionSourceCode(t, actionName)),
 		Action:      actionName,
 		Secrets:     secrets,
+		ProjectKey:  projectKey,
 	}
 
 	if model.ActionNeedsCriteria(actionName) {

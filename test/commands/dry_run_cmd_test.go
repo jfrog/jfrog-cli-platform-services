@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/jfrog/jfrog-cli-platform-services/itests/infra"
 	"github.com/jfrog/jfrog-cli-platform-services/model"
+	"github.com/jfrog/jfrog-cli-platform-services/test/infra"
 )
 
 type dryRunTestCase struct {
@@ -83,9 +83,9 @@ func TestDryRun(t *testing.T) {
 			assert:      assertDryRunFail("missing file path"),
 		}),
 		dryRunSpec(dryRunTestCase{
-			name:        "with existing secrets",
-			stdInput:    "{}",
+			name:        "with project and secrets update",
 			commandArgs: []string{"-"},
+			stdInput:    "{}",
 			code:        "export default async (context) => ({ 'check': context.secrets.get('sec-1') === 'val-1-updated' })",
 			initWorkers: []*model.WorkerDetails{
 				{
@@ -99,9 +99,11 @@ func TestDryRun(t *testing.T) {
 							Key: "sec-1", Value: "val-1",
 						},
 					},
+					ProjectKey: "my-project",
 				},
 			},
 			patchManifest: func(mf *model.Manifest) {
+				mf.ProjectKey = "my-project"
 				mf.Name = "wk-1"
 				mf.Secrets = model.Secrets{"sec-1": infra.MustEncryptSecret(t, "val-1-updated")}
 			},
@@ -121,13 +123,13 @@ func dryRunSpec(tc dryRunTestCase) infra.TestDefinition {
 			for _, initialWorker := range tc.initWorkers {
 				it.CreateWorker(initialWorker)
 				it.Cleanup(func() {
-					it.DeleteWorker(initialWorker.Key)
+					it.DeleteWorker(initialWorker.KeyWithProject())
 				})
 			}
 
 			workerDir, workerName := it.PrepareWorkerTestDir()
 
-			err := it.RunCommand("worker", "init", "GENERIC_EVENT", workerName)
+			err := it.RunCommand(infra.AppName, "init", "GENERIC_EVENT", workerName)
 			require.NoError(it, err)
 
 			// We make a generic event that returns its input as default code
@@ -145,7 +147,7 @@ func dryRunSpec(tc dryRunTestCase) infra.TestDefinition {
 				infra.PatchManifest(it, tc.patchManifest)
 			}
 
-			cmd := []string{"worker", "dry-run"}
+			cmd := []string{infra.AppName, "dry-run"}
 			cmd = append(cmd, tc.commandArgs...)
 
 			if tc.fileInput != "" {
@@ -178,13 +180,14 @@ func assertDryRunSucceed(it *infra.Test, err error, tc *dryRunTestCase) {
 		require.NoError(it, err)
 	}
 
-	assert.Equal(it, map[string]any{
-		"genericEvent": map[string]any{
+	gotGenericEvent, ok := gotResponse["genericEvent"]
+	require.Truef(it, ok, "Generic not found in response")
+
+	assert.Equal(it,
+		map[string]any{
 			"data":            wantResponse,
 			"executionStatus": "STATUS_SUCCESS",
-		},
-		"logs": "\n",
-	}, gotResponse)
+		}, gotGenericEvent)
 }
 
 func assertDryRunFail(errorMessage string, errorMessageArgs ...any) dryRunAssertFunc {

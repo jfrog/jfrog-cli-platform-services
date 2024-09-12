@@ -8,11 +8,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/jfrog/jfrog-cli-platform-services/itests/infra"
 	"github.com/jfrog/jfrog-cli-platform-services/model"
+	"github.com/jfrog/jfrog-cli-platform-services/test/infra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -57,6 +59,20 @@ func TestListCommand(t *testing.T) {
 		},
 	}
 
+	workerWithProject := &model.WorkerDetails{
+		Key:         fmt.Sprintf("w%v", time.Now().Unix()+3),
+		Description: "My worker 3",
+		Enabled:     true,
+		Debug:       true,
+		SourceCode:  `export default async function() { return { "status": "OK" } }`,
+		Action:      model.ActionGenericEvent,
+		ProjectKey:  "my-project",
+	}
+
+	slices.SortFunc(initialWorkers, func(a, b *model.WorkerDetails) int {
+		return strings.Compare(a.Key, b.Key)
+	})
+
 	infra.RunITests([]infra.TestDefinition{
 		listTestSpec(listTestCase{
 			name:         "list",
@@ -65,15 +81,21 @@ func TestListCommand(t *testing.T) {
 		}),
 		listTestSpec(listTestCase{
 			name:         "list worker of type",
+			commandArgs:  []string{"--" + model.FlagJsonOutput, "BEFORE_DOWNLOAD"},
+			initWorkers:  initialWorkers,
+			assertOutput: assertWorkerListJSON(initialWorkers[2:]...),
+		}),
+		listTestSpec(listTestCase{
+			name:         "list for JSON",
 			commandArgs:  []string{"--" + model.FlagJsonOutput},
 			initWorkers:  initialWorkers,
 			assertOutput: assertWorkerListJSON(initialWorkers...),
 		}),
 		listTestSpec(listTestCase{
-			name:         "list for JSON",
-			commandArgs:  []string{"--" + model.FlagJsonOutput, "BEFORE_DOWNLOAD"},
-			initWorkers:  initialWorkers,
-			assertOutput: assertWorkerListJSON(initialWorkers[2:]...),
+			name:         "list with projectKey",
+			commandArgs:  []string{"--" + model.FlagJsonOutput, "--" + model.FlagProjectKey, "my-project"},
+			initWorkers:  []*model.WorkerDetails{initialWorkers[0], workerWithProject},
+			assertOutput: assertWorkerListJSON(workerWithProject),
 		}),
 		listTestSpec(listTestCase{
 			name:        "fails if invalid timeout",
@@ -102,7 +124,7 @@ func listTestSpec(tc listTestCase) infra.TestDefinition {
 				it.CreateWorker(initialWorker)
 			}
 
-			cmd := append([]string{"worker", "list"}, tc.commandArgs...)
+			cmd := append([]string{infra.AppName, "list"}, tc.commandArgs...)
 
 			err := it.RunCommand(cmd...)
 
@@ -137,12 +159,6 @@ func assertWorkerListCsv(workers []*model.WorkerDetails) func(t require.TestingT
 }
 
 func assertWorkerListJSON(workers ...*model.WorkerDetails) func(t require.TestingT, content []byte) {
-	var csvRecords [][]string
-
-	for _, wk := range workers {
-		csvRecords = append(csvRecords, []string{wk.Key, wk.Action, wk.Description, fmt.Sprint(wk.Enabled)})
-	}
-
 	return func(t require.TestingT, content []byte) {
 		gotWorkers := struct {
 			Workers []*model.WorkerDetails `json:"workers"`
@@ -159,6 +175,8 @@ func assertWorkerListJSON(workers ...*model.WorkerDetails) func(t require.Testin
 			assert.Equalf(t, wantWorker.Action, gotWorker.Action, "Action mismatch")
 			assert.Equalf(t, wantWorker.Description, gotWorker.Description, "Description mismatch")
 			assert.Equalf(t, wantWorker.Enabled, gotWorker.Enabled, "Enabled mismatch")
+			assert.Equalf(t, wantWorker.Debug, gotWorker.Debug, "Debug mismatch")
+			assert.Equalf(t, wantWorker.ProjectKey, gotWorker.ProjectKey, "ProjectKey mismatch")
 		}
 	}
 }

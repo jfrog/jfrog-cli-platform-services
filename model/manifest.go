@@ -27,6 +27,8 @@ type Manifest struct {
 	SourceCodePath string         `json:"sourceCodePath"`
 	Action         string         `json:"action"`
 	Enabled        bool           `json:"enabled"`
+	Debug          bool           `json:"debug"`
+	ProjectKey     string         `json:"projectKey"`
 	Secrets        Secrets        `json:"secrets"`
 	FilterCriteria FilterCriteria `json:"filterCriteria,omitempty"`
 }

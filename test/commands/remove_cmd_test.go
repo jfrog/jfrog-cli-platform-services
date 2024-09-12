@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/jfrog/jfrog-cli-platform-services/itests/infra"
 	"github.com/jfrog/jfrog-cli-platform-services/model"
+	"github.com/jfrog/jfrog-cli-platform-services/test/infra"
 )
 
 type removeTestCase struct {
@@ -54,10 +54,10 @@ func removeTestSpec(tc removeTestCase) infra.TestDefinition {
 				workerName = tc.workerKey
 			}
 
-			err := it.RunCommand("worker", "init", "GENERIC_EVENT", workerName)
+			err := it.RunCommand(infra.AppName, "init", "GENERIC_EVENT", workerName)
 			require.NoError(it, err)
 
-			err = it.RunCommand("worker", "deploy")
+			err = it.RunCommand(infra.AppName, "deploy")
 			require.NoError(it, err)
 			if err == nil {
 				// We make sure to undeploy our worker
@@ -66,7 +66,7 @@ func removeTestSpec(tc removeTestCase) infra.TestDefinition {
 				})
 			}
 
-			cmd := append([]string{"worker", "undeploy"}, tc.commandArgs...)
+			cmd := append([]string{infra.AppName, "undeploy"}, tc.commandArgs...)
 			err = it.RunCommand(cmd...)
 
 			if tc.wantErr == nil {

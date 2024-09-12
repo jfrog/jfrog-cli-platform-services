@@ -23,39 +23,27 @@ func GetRemoveCommand() components.Command {
 		Arguments: []components.Argument{
 			model.GetWorkerKeyArgument(),
 		},
-		Action: func(c *components.Context) error {
-			var workerKey string
-
-			if len(c.Arguments) > 0 {
-				workerKey = c.Arguments[0]
-			}
-
-			if workerKey == "" {
-				manifest, err := model.ReadManifest()
-				if err != nil {
-					return err
-				}
-
-				if err = manifest.Validate(); err != nil {
-					return err
-				}
-
-				workerKey = manifest.Name
-			}
-
-			server, err := model.GetServerDetails(c)
-			if err != nil {
-				return err
-			}
-
-			log.Info(fmt.Sprintf("Removing worker '%s' ...", workerKey))
-
-			err = callWorkerApiSilent(c, server.GetUrl(), server.GetAccessToken(), http.MethodDelete, nil, http.StatusNoContent, "workers", workerKey)
-			if err == nil {
-				log.Info(fmt.Sprintf("Worker '%s' removed", workerKey))
-			}
-
-			return err
-		},
+		Action: runRemoveCommand,
 	}
+}
+
+func runRemoveCommand(c *components.Context) error {
+	workerKey, _, err := extractProjectAndKeyFromCommandContext(c, c.Arguments, 0, false)
+	if err != nil {
+		return err
+	}
+
+	server, err := model.GetServerDetails(c)
+	if err != nil {
+		return err
+	}
+
+	log.Info(fmt.Sprintf("Removing worker '%s' ...", workerKey))
+
+	err = callWorkerApiSilent(c, server.GetUrl(), server.GetAccessToken(), http.MethodDelete, nil, http.StatusNoContent, nil, "workers", workerKey)
+	if err == nil {
+		log.Info(fmt.Sprintf("Worker '%s' removed", workerKey))
+	}
+
+	return err
 }

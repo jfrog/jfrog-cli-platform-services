@@ -6,7 +6,6 @@ BINARY_CLI = bin
 WORKSPACE_ROOT = $(shell cd "${PROJECT_DIR}" && pwd)
 TOOLS_DIR := $(CURDIR)/.tools
 SCRIPTS_DIR = ${PROJECT_DIR}/.github/scripts
-TARGET_DIR = ${PROJECT_DIR}/target
 LINKERFLAGS = -s -w
 COMPILERFLAGS = all=-trimpath=$(WORKSPACE_ROOT)
 GOOS = $(shell go env GOOS)
@@ -44,34 +43,13 @@ GOLANGCI_LINT:
 	${GOLANGCI_LINT} --version 2>/dev/null | grep ${GOLANGCI_LINT_VERSION} || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${TOOLS_DIR} v${GOLANGCI_LINT_VERSION}
 
 ########## BUILD ##########
-prereq::
-	${GOCMD} install github.com/jstemmer/go-junit-report@v1.0.0
-
 build::
 	go env GOOS GOARCH
 	go build -ldflags="${LINKERFLAGS}" -gcflags ${COMPILERFLAGS} -o ${BINARY_CLI}/worker-cli-plugin main.go
 
-
 build-install:: build
-	mkdir -p "${HOME}/.jfrog/plugins/worker/bin"
-	mv ${BINARY_CLI}/worker-cli-plugin "${HOME}/.jfrog/plugins/worker/bin/worker"
-	chmod +x "${HOME}/.jfrog/plugins/worker/bin/worker"
-
-########## TEST ##########
-
-test-prereq: prereq
-	mkdir -p target/reports
-
-test: PACKAGES=./...
-test: TEST_ARGS=-short
-test: test-prereq do-run-tests
-
-itest: PACKAGES=./test/...
-itest: TAGS=-tags=itest
-itest: TEST_ARGS=-count=1 -p=1
-itest:: test-prereq do-run-tests
-
-do-run-tests::
-	$(SCRIPTS_DIR)/gotest.sh $$(go list $(TAGS) $(PACKAGES) | grep -v "^.*/mocks$$") -timeout 30m -coverpkg=github.com/jfrog/jfrog-cli-platform-services/... -coverprofile=$(TARGET_DIR)/reports/coverage.out $(TEST_ARGS) $(TAGS)
+	mkdir -p "${HOME}/.jfrog/plugins/worker-qa/bin"
+	mv ${BINARY_CLI}/worker-cli-plugin "${HOME}/.jfrog/plugins/worker-qa/bin/worker-qa"
+	chmod +x "${HOME}/.jfrog/plugins/worker-qa/bin/worker-qa"
 
 .PHONY: $(MAKECMDGOALS)

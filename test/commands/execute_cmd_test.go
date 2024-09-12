@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/jfrog/jfrog-cli-platform-services/itests/infra"
 	"github.com/jfrog/jfrog-cli-platform-services/model"
+	"github.com/jfrog/jfrog-cli-platform-services/test/infra"
 )
 
 type executeTestCase struct {
@@ -118,7 +118,7 @@ func executeSpec(tc executeTestCase) infra.TestDefinition {
 				action = tc.action
 			}
 
-			err := it.RunCommand("worker", "init", action, workerName)
+			err := it.RunCommand(infra.AppName, "init", action, workerName)
 			require.NoError(it, err)
 
 			if action == "GENERIC_EVENT" {
@@ -138,14 +138,14 @@ func executeSpec(tc executeTestCase) infra.TestDefinition {
 			})
 
 			// We should deploy the worker
-			err = it.RunCommand("worker", "deploy")
+			err = it.RunCommand(infra.AppName, "deploy")
 			require.NoError(it, err)
 
 			it.Cleanup(func() {
 				it.DeleteWorker(workerName)
 			})
 
-			cmd := []string{"worker", "execute"}
+			cmd := []string{infra.AppName, "execute"}
 			cmd = append(cmd, tc.commandArgs...)
 
 			if tc.fileInput != "" {

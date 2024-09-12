@@ -36,7 +36,8 @@ func TestExecute(t *testing.T) {
 		// If provided the cliIn will be filled with this content
 		stdInput string
 		// If provided a temp file will be generated with this content and the file path will be added at the end of the command
-		fileInput string
+		fileInput     string
+		patchManifest func(mf *model.Manifest)
 	}{
 		{
 			name: "execute from manifest",
@@ -95,6 +96,26 @@ func TestExecute(t *testing.T) {
 				requestBody:    map[string]any{"my": "file-content"},
 				responseBody:   map[string]any{"valid": "response"},
 				responseStatus: http.StatusOK,
+			},
+			assert: assertExecuteSucceed,
+		},
+		{
+			name:      "should propagate projectKey",
+			workerKey: "my-worker",
+			token:     "valid-token",
+			serverBehavior: &executeServerStubBehavior{
+				requestToken: "valid-token",
+				requestParams: map[string]string{
+					"projectKey": "my-project",
+				},
+				responseBody:   map[string]any{"valid": "response"},
+				responseStatus: http.StatusOK,
+			},
+			commandArgs: []string{"-"},
+			stdInput:    `{}`,
+			patchManifest: func(mf *model.Manifest) {
+				mf.ProjectKey = "my-project"
+				mf.Name = "my-worker"
 			},
 			assert: assertExecuteSucceed,
 		},
@@ -159,6 +180,10 @@ func TestExecute(t *testing.T) {
 
 			err := runCmd("worker", "init", action, workerName)
 			require.NoError(t, err)
+
+			if tt.patchManifest != nil {
+				patchManifest(t, tt.patchManifest)
+			}
 
 			serverResponseStubs := map[string]*executeServerStubBehavior{}
 			if tt.serverBehavior != nil {
@@ -239,6 +264,7 @@ type executeServerStubBehavior struct {
 	responseBody   map[string]any
 	requestToken   string
 	requestBody    map[string]any
+	requestParams  map[string]string
 }
 
 type executeServerStub struct {
@@ -287,6 +313,14 @@ func (s *executeServerStub) ServeHTTP(res http.ResponseWriter, req *http.Request
 	if req.Header.Get("authorization") != "Bearer "+behavior.requestToken {
 		res.WriteHeader(http.StatusForbidden)
 		return
+	}
+
+	// Validate the request params
+	for k, v := range behavior.requestParams {
+		if req.URL.Query().Get(k) != v {
+			res.WriteHeader(http.StatusBadRequest)
+			return
+		}
 	}
 
 	// Validate body if requested

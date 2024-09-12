@@ -45,3 +45,9 @@ func PatchManifest(t require.TestingT, applyPatch func(mf *model.Manifest), dir 
 
 	require.NoError(t, mf.Save(dir...))
 }
+
+func PatchWorker(s *model.WorkerDetails, applyPatch func(w *model.WorkerDetails)) *model.WorkerDetails {
+	t := *s
+	applyPatch(&t)
+	return &t
+}

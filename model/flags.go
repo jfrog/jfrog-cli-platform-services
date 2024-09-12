@@ -20,6 +20,7 @@ const (
 	FlagNoSecrets        = "no-secrets"
 	FlagJsonOutput       = "json"
 	FlagTimeout          = "timeout-ms"
+	FlagProjectKey       = "project-key"
 	defaultTimeoutMillis = 5000
 )
 
@@ -45,6 +46,10 @@ func GetJsonOutputFlag(description ...string) components.BoolFlag {
 
 func GetTimeoutFlag() components.StringFlag {
 	return components.NewStringFlag(FlagTimeout, "The request timeout in milliseconds", components.WithIntDefaultValue(defaultTimeoutMillis))
+}
+
+func GetProjectKeyFlag() components.StringFlag {
+	return components.NewStringFlag(FlagProjectKey, "A project key to use for the request", components.WithStrDefaultValue(""))
 }
 
 func GetNoSecretsFlag(description ...string) components.BoolFlag {

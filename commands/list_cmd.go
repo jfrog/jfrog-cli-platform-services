@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 	"slices"
 	"strings"
 
@@ -29,6 +28,7 @@ func GetListCommand() components.Command {
 			plugins_common.GetServerIdFlag(),
 			model.GetJsonOutputFlag("Use JSON instead of CSV as output"),
 			model.GetTimeoutFlag(),
+			model.GetProjectKeyFlag(),
 		},
 		Arguments: []components.Argument{
 			{
@@ -49,12 +49,18 @@ func GetListCommand() components.Command {
 
 func runListCommand(ctx *components.Context, serverUrl string, token string) error {
 	api := "workers"
+	params := make(map[string]string)
 
 	if len(ctx.Arguments) > 0 {
-		api = fmt.Sprintf("%s?action=%s", api, url.QueryEscape(ctx.Arguments[0]))
+		params["action"] = ctx.Arguments[0]
 	}
 
-	res, discardReq, err := callWorkerApi(ctx, serverUrl, token, http.MethodGet, nil, api)
+	projectKey := ctx.GetStringFlagValue(model.FlagProjectKey)
+	if projectKey != "" {
+		params["projectKey"] = projectKey
+	}
+
+	res, discardReq, err := callWorkerApi(ctx, serverUrl, token, http.MethodGet, nil, params, api)
 	if discardReq != nil {
 		defer discardReq()
 	}
