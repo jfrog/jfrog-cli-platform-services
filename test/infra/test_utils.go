@@ -5,6 +5,7 @@ package infra
 import (
 	"encoding/json"
 	"os"
+	"sort"
 
 	"github.com/jfrog/jfrog-cli-platform-services/model"
 
@@ -50,4 +51,10 @@ func PatchWorker(s *model.WorkerDetails, applyPatch func(w *model.WorkerDetails)
 	t := *s
 	applyPatch(&t)
 	return &t
+}
+
+func SortWorkers(workers []*model.WorkerDetails) {
+	sort.Slice(workers, func(i, j int) bool {
+		return workers[i].Key < workers[j].Key
+	})
 }

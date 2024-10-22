@@ -168,6 +168,9 @@ func assertWorkerListJSON(workers ...*model.WorkerDetails) func(t require.Testin
 
 		assert.Equalf(t, len(workers), len(gotWorkers.Workers), "Length mismatch")
 
+		infra.SortWorkers(workers)
+		infra.SortWorkers(gotWorkers.Workers)
+
 		for i, wantWorker := range workers {
 			gotWorker := gotWorkers.Workers[i]
 
