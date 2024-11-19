@@ -1,3 +1,6 @@
+//go:build test
+// +build test
+
 package commands
 
 import (
@@ -5,8 +8,9 @@ import (
 	"os"
 	"path"
 	"regexp"
-	"strings"
 	"testing"
+
+	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 
 	"github.com/jfrog/jfrog-cli-platform-services/model"
 
@@ -16,7 +20,7 @@ import (
 
 type runCommandFunc func(args ...string) error
 
-func TestGetCommand(t *testing.T) {
+func TestInitCommand(t *testing.T) {
 	cmd := GetInitCommand()
 
 	assert.Equalf(t, "init", cmd.Name, "Invalid command name")
@@ -37,6 +41,7 @@ func TestGetCommand(t *testing.T) {
 func TestInitWorker(t *testing.T) {
 	tests := []struct {
 		name string
+		stub *common.ServerStub
 		test func(t *testing.T, runCommand runCommandFunc)
 	}{
 		{
@@ -56,8 +61,17 @@ func TestInitWorker(t *testing.T) {
 		{
 			name: "invalid action",
 			test: func(t *testing.T, runCommand runCommandFunc) {
-				err := runCommand("worker", "init", "HACK_SYSTEM", "root")
-				assert.EqualError(t, err, fmt.Sprintf("invalid action '%s' action should be one of: %s", "HACK_SYSTEM", strings.Split(model.ActionNames(), "|")))
+				err := runCommand("worker", "init", "--timeout-ms", "60000", "HACK_SYSTEM", "root")
+				assert.Regexp(t, regexp.MustCompile(`^\s*invalid\s+action\s+'HACK_SYSTEM'\s+action\s+should\s+be\s+one\s+of:\s+\[[^]]+]\s*$`), err)
+			},
+		},
+		{
+			name: "should propagate projectKey",
+			stub: common.NewServerStub(t).WithDefaultActionsMetadataEndpoint().WithProjectKey("prj-1"),
+			test: func(t *testing.T, runCommand runCommandFunc) {
+				common.PrepareWorkerDirForTest(t)
+				err := runCommand("worker", "init", "--"+model.FlagProjectKey, "prj-1", "BEFORE_DOWNLOAD", "root")
+				assert.NoError(t, err)
 			},
 		},
 		{
@@ -107,19 +121,19 @@ func TestInitWorker(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.test(t, createCliRunner(t, GetInitCommand()))
+			stub := tt.stub
+			if stub == nil {
+				stub = common.NewServerStub(t).WithDefaultActionsMetadataEndpoint()
+			}
+			common.NewMockWorkerServer(t, stub)
+			tt.test(t, common.CreateCliRunner(t, GetInitCommand()))
 		})
 	}
 }
 
 func testGenerateWithOverwrite(fileName string, overwrite bool) func(t *testing.T, runCommand runCommandFunc) {
 	return func(t *testing.T, runCommand runCommandFunc) {
-		dir, err := os.MkdirTemp("", "worker-*.init")
-		require.NoError(t, err)
-
-		t.Cleanup(func() {
-			_ = os.RemoveAll(dir)
-		})
+		dir, _ := common.PrepareWorkerDirForTest(t)
 
 		// Simulate an existing file
 		f, err := os.OpenFile(path.Join(dir, fileName), os.O_CREATE|os.O_WRONLY, os.ModePerm)
@@ -152,16 +166,14 @@ func testGenerateWithOverwrite(fileName string, overwrite bool) func(t *testing.
 			assert.NoError(t, err)
 		} else {
 			require.NotNilf(t, err, "an error was expected")
-			errMatched, err := regexp.MatchString(fmt.Sprintf(`%s already exists in \S+/%s, please use '--force' to overwrite if you know what you are doing`, fileName, workerName), err.Error())
-			require.NoError(t, err)
-			assert.True(t, errMatched)
+			assert.Regexp(t, fmt.Sprintf(`%s already exists in \S+/%s, please use '--force' to overwrite if you know what you are doing`, fileName, workerName), err.Error())
 		}
 	}
 }
 
 func testGenerateAction(actionName string, withTests bool, runCommand runCommandFunc) func(t *testing.T) {
 	return func(t *testing.T) {
-		dir, workerName := prepareWorkerDirForTest(t)
+		dir, workerName := common.PrepareWorkerDirForTest(t)
 
 		manifestPath := path.Join(dir, "manifest.json")
 		workerSourcePath := path.Join(dir, "worker.ts")
@@ -169,11 +181,11 @@ func testGenerateAction(actionName string, withTests bool, runCommand runCommand
 		packageJsonPath := path.Join(dir, "package.json")
 		tsconfigJsonPath := path.Join(dir, "tsconfig.json")
 
-		wantManifest := generateForTest(t, actionName, workerName, "manifest.json_template", !withTests)
-		wantPackageJson := generateForTest(t, actionName, workerName, "package.json_template", !withTests)
-		wantWorkerSource := generateForTest(t, actionName, workerName, actionName+".ts_template", !withTests)
-		wantWorkerTestSource := generateForTest(t, actionName, workerName, actionName+".spec.ts_template", !withTests)
-		wantTsconfig := generateForTest(t, actionName, workerName, "tsconfig.json_template", !withTests)
+		wantManifest := common.GenerateFromSamples(t, templates, actionName, workerName, "", "manifest.json_template", !withTests)
+		wantPackageJson := common.GenerateFromSamples(t, templates, actionName, workerName, "", "package.json_template", !withTests)
+		wantWorkerSource := common.GenerateFromSamples(t, templates, actionName, workerName, "", "worker.ts_template", !withTests)
+		wantWorkerTestSource := common.GenerateFromSamples(t, templates, actionName, workerName, "", "worker.spec.ts_template", !withTests)
+		wantTsconfig := common.GenerateFromSamples(t, templates, actionName, workerName, "", "tsconfig.json_template", !withTests)
 
 		commandArgs := []string{"worker", "init"}
 		if !withTests {
@@ -209,7 +221,8 @@ func testGenerateAction(actionName string, withTests bool, runCommand runCommand
 }
 
 func testGenerateAllActions(t *testing.T, runCommand runCommandFunc) {
-	for _, actionName := range strings.Split(model.ActionNames(), "|") {
+	actionsMeta := common.LoadSampleActions(t)
+	for _, actionName := range actionsMeta.ActionsNames() {
 		t.Run(actionName, testGenerateAction(actionName, true, runCommand))
 		t.Run(actionName+" without tests", testGenerateAction(actionName, false, runCommand))
 	}

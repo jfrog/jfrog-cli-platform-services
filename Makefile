@@ -34,7 +34,7 @@ GOIMPORTS:
 ########## ANALYSE ##########
 
 GOLANGCI_LINT         = ${TOOLS_DIR}/golangci-lint
-GOLANGCI_LINT_VERSION = 1.55.2
+GOLANGCI_LINT_VERSION = 1.62.2
 
 verify: GOLANGCI_LINT
 	echo $(GO_SOURCES)
@@ -59,7 +59,17 @@ build-install:: build
 
 ########## TEST ##########
 
-test-prereq: prereq
+.PHONY: clean-mock
+clean-mock:
+	@echo Cleaning generated mock files
+	find . -path "*/mocks/*.go" -delete
+
+.PHONY: generate-mock
+generate-mock: clean-mock
+	@echo Generating test mocks
+	go generate ./...
+
+test-prereq: prereq generate-mock
 	mkdir -p target/reports
 
 test: PACKAGES=./...

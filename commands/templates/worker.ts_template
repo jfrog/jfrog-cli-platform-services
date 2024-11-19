@@ -1,0 +1,6 @@
+import { PlatformContext } from 'jfrog-workers';
+{{- with .UsedTypes}}
+import { {{ . }} } from './types';
+{{- end }}
+
+{{ .SourceCode -}}

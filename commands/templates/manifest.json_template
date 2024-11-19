@@ -1,15 +1,18 @@
 {
     "name": "{{.WorkerName}}",
     "description": "Run a script on {{.Action}}",
-{{- if .HasCriteria }}
+{{- if .HasRepoFilterCriteria }}
     "filterCriteria": {
         "artifactFilterCriteria": {
             "repoKeys": ["example-repo-local"]
         }
     },
-{{ end}}
+{{- end }}
     "secrets": {},
     "sourceCodePath": "./worker.ts",
     "action": "{{.Action}}",
-    "enabled": false
+    "enabled": false,
+    "debug": false,
+    "projectKey": "{{.ProjectKey}}",
+    "application": "{{.Application}}"
 }

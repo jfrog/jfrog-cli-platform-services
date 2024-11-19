@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
+
 	plugins_common "github.com/jfrog/jfrog-cli-core/v2/plugins/common"
 	"github.com/jfrog/jfrog-cli-core/v2/plugins/components"
 	"github.com/jfrog/jfrog-cli-core/v2/utils/ioutils"
@@ -38,12 +40,12 @@ func GetAddSecretCommand() components.Command {
 }
 
 func (c *addSecretCommand) run() error {
-	manifest, err := model.ReadManifest()
+	manifest, err := common.ReadManifest()
 	if err != nil {
 		return err
 	}
 
-	if err = manifest.Validate(); err != nil {
+	if err = common.ValidateManifest(manifest, nil); err != nil {
 		return err
 	}
 
@@ -57,7 +59,7 @@ func (c *addSecretCommand) run() error {
 		return err
 	}
 
-	encryptionKey, err := model.ReadSecretPassword()
+	encryptionKey, err := common.ReadSecretPassword()
 	if err != nil {
 		return err
 	}
@@ -67,7 +69,7 @@ func (c *addSecretCommand) run() error {
 		return err
 	}
 
-	encryptedValue, err := model.EncryptSecret(encryptionKey, secretValue)
+	encryptedValue, err := common.EncryptSecret(encryptionKey, secretValue)
 	if err != nil {
 		return err
 	}
@@ -78,7 +80,7 @@ func (c *addSecretCommand) run() error {
 		existingEncryptedSecrets[k] = v
 	}
 
-	if err = manifest.DecryptSecrets(encryptionKey); err != nil {
+	if err = common.DecryptManifestSecrets(manifest, encryptionKey); err != nil {
 		log.Debug("Cannot decrypt existing secrets: %+v", err)
 		return fmt.Errorf("others secrets are encrypted with a different password, please use the same one")
 	} else {
@@ -91,7 +93,7 @@ func (c *addSecretCommand) run() error {
 		manifest.Secrets[secretName] = encryptedValue
 	}
 
-	err = manifest.Save()
+	err = common.SaveManifest(manifest)
 	if err != nil {
 		return err
 	}

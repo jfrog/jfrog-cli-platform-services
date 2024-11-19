@@ -13,7 +13,7 @@ import (
 func TestGetTimeoutParameter(t *testing.T) {
 	tests := []struct {
 		name         string
-		flagProvider intFlagProvider
+		flagProvider IntFlagProvider
 		want         time.Duration
 		wantErr      string
 	}{

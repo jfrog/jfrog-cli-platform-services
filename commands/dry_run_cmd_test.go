@@ -1,160 +1,136 @@
+//go:build test
+// +build test
+
 package commands
 
 import (
 	"bytes"
-	"context"
-	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
-	"net/http/httptest"
 	"os"
-	"reflect"
-	"regexp"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/jfrog/jfrog-cli-platform-services/model"
 )
 
-type dryRunAssertFunc func(t *testing.T, stdOutput []byte, err error, serverBehavior *dryRunServerStubBehavior)
-
 func TestDryRun(t *testing.T) {
 	tests := []struct {
 		name          string
 		commandArgs   []string
-		assert        dryRunAssertFunc
+		assert        common.AssertOutputFunc
 		patchManifest func(mf *model.Manifest)
-		// Token to be sent in the request
-		token string
 		// Use this workerKey instead of a random generated one
 		workerKey string
 		// The server behavior
-		serverBehavior *dryRunServerStubBehavior
+		serverStub *common.ServerStub
 		// If provided the cliIn will be filled with this content
 		stdInput string
 		// If provided a temp file will be generated with this content and the file path will be added at the end of the command
 		fileInput string
 	}{
 		{
-			name:  "nominal case",
-			token: "my-token",
-			serverBehavior: &dryRunServerStubBehavior{
-				responseStatus: http.StatusOK,
-				responseBody: map[string]any{
-					"my": "payload",
-				},
-				requestToken: "my-token",
-			},
-			commandArgs: []string{mustJsonMarshal(t, map[string]any{"my": "payload"})},
-			assert:      assertDryRunSucceed,
+			name: "nominal case",
+			serverStub: common.NewServerStub(t).
+				WithTestEndpoint(
+					validateTestPayloadData(map[string]any{"my": "payload"}),
+					map[string]any{"my": "payload"},
+				),
+			commandArgs: []string{common.MustJsonMarshal(t, map[string]any{"my": "payload"})},
+			assert:      common.AssertOutputJson(map[string]any{"my": "payload"}),
 		},
 		{
-			name:  "fails if not OK status",
-			token: "invalid-token",
-			serverBehavior: &dryRunServerStubBehavior{
-				requestToken: "valid-token",
-			},
+			name: "fails if not OK status",
+			serverStub: common.NewServerStub(t).
+				WithToken("invalid-token").
+				WithTestEndpoint(nil, nil),
 			commandArgs: []string{`{}`},
-			assert:      assertDryRunFail("command failed with status %d", http.StatusForbidden),
+			assert:      common.AssertOutputErrorRegexp(`command\s.+returned\san\sunexpected\sstatus\scode\s403`),
 		},
 		{
 			name:     "reads from stdin",
-			token:    "valid-token",
-			stdInput: mustJsonMarshal(t, map[string]any{"my": "request"}),
-			serverBehavior: &dryRunServerStubBehavior{
-				requestToken:   "valid-token",
-				requestBody:    map[string]any{"my": "request"},
-				responseBody:   map[string]any{"valid": "response"},
-				responseStatus: http.StatusOK,
-			},
+			stdInput: common.MustJsonMarshal(t, map[string]any{"my": "request"}),
+			serverStub: common.NewServerStub(t).
+				WithTestEndpoint(
+					validateTestPayloadData(map[string]any{"my": "request"}),
+					map[string]any{"valid": "response"},
+				),
 			commandArgs: []string{"-"},
-			assert:      assertDryRunSucceed,
+			assert:      common.AssertOutputJson(map[string]any{"valid": "response"}),
 		},
 		{
 			name:      "reads from file",
-			token:     "valid-token",
-			fileInput: mustJsonMarshal(t, map[string]any{"my": "file-content"}),
-			serverBehavior: &dryRunServerStubBehavior{
-				requestToken:   "valid-token",
-				requestBody:    map[string]any{"my": "file-content"},
-				responseBody:   map[string]any{"valid": "response"},
-				responseStatus: http.StatusOK,
-			},
-			assert: assertDryRunSucceed,
+			fileInput: common.MustJsonMarshal(t, map[string]any{"my": "file-content"}),
+			serverStub: common.NewServerStub(t).
+				WithTestEndpoint(
+					validateTestPayloadData(map[string]any{"my": "file-content"}),
+					map[string]any{"valid": "response"},
+				),
+			assert: common.AssertOutputJson(map[string]any{"valid": "response"}),
 		},
 		{
 			name:        "fails if invalid json from argument",
 			commandArgs: []string{`{"my":`},
-			assert:      assertDryRunFail("invalid json payload: unexpected end of JSON input"),
+			assert:      common.AssertOutputError("invalid json payload: unexpected end of JSON input"),
 		},
 		{
 			name:      "fails if invalid json from file argument",
 			fileInput: `{"my":`,
-			assert:    assertDryRunFail("invalid json payload: unexpected end of JSON input"),
+			assert:    common.AssertOutputError("invalid json payload: unexpected end of JSON input"),
 		},
 		{
 			name:        "fails if invalid json from standard input",
 			commandArgs: []string{"-"},
 			stdInput:    `{"my":`,
-			assert:      assertDryRunFail("unexpected EOF"),
+			assert:      common.AssertOutputError("unexpected EOF"),
 		},
 		{
 			name:        "fails if missing file",
 			commandArgs: []string{"@non-existing-file.json"},
-			assert:      assertDryRunFail("open non-existing-file.json: no such file or directory"),
+			assert:      common.AssertOutputError("open non-existing-file.json: no such file or directory"),
 		},
 		{
 			name:        "fails if timeout exceeds",
 			commandArgs: []string{"--" + model.FlagTimeout, "500", `{}`},
-			serverBehavior: &dryRunServerStubBehavior{
-				waitFor: 5 * time.Second,
-			},
-			assert: assertDryRunFail("request timed out after 500ms"),
+			serverStub:  common.NewServerStub(t).WithDelay(5*time.Second).WithTestEndpoint(nil, nil),
+			assert:      common.AssertOutputError("request timed out after 500ms"),
 		},
 		{
 			name:        "fails if invalid timeout",
 			commandArgs: []string{"--" + model.FlagTimeout, "abc", `{}`},
-			assert:      assertDryRunFail("invalid timeout provided"),
+			assert:      common.AssertOutputError("invalid timeout provided"),
 		},
 		{
 			name:        "fails if empty file path",
 			commandArgs: []string{"@"},
-			assert:      assertDryRunFail("missing file path"),
+			assert:      common.AssertOutputError("missing file path"),
 		},
 		{
 			name:      "should propagate projectKey",
 			workerKey: "my-worker",
-			token:     "valid-token",
-			serverBehavior: &dryRunServerStubBehavior{
-				requestToken: "valid-token",
-				requestParams: map[string]string{
-					"projectKey": "my-project",
-				},
-				responseBody:   map[string]any{"valid": "response"},
-				responseStatus: http.StatusOK,
-			},
+			serverStub: common.NewServerStub(t).
+				WithProjectKey("my-project").
+				WithTestEndpoint(
+					validateTestPayloadData(map[string]any{}),
+					map[string]any{"valid": "response"},
+				),
 			commandArgs: []string{"-"},
 			stdInput:    `{}`,
 			patchManifest: func(mf *model.Manifest) {
 				mf.ProjectKey = "my-project"
 				mf.Name = "my-worker"
 			},
-			assert: assertDryRunSucceed,
+			assert: common.AssertOutputJson(map[string]any{"valid": "response"}),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancelCtx := context.WithCancel(context.Background())
-			t.Cleanup(cancelCtx)
+			runCmd := common.CreateCliRunner(t, GetInitCommand(), GetDryRunCommand())
 
-			runCmd := createCliRunner(t, GetInitCommand(), GetDryRunCommand())
-
-			_, workerName := prepareWorkerDirForTest(t)
+			_, workerName := common.PrepareWorkerDirForTest(t)
 
 			if tt.workerKey != "" {
 				workerName = tt.workerKey
@@ -164,185 +140,56 @@ func TestDryRun(t *testing.T) {
 			require.NoError(t, err)
 
 			if tt.patchManifest != nil {
-				patchManifest(t, tt.patchManifest)
+				common.PatchManifest(t, tt.patchManifest)
 			}
 
-			serverResponseStubs := map[string]*dryRunServerStubBehavior{}
-			if tt.serverBehavior != nil {
-				key := workerName
-				serverResponseStubs[key] = tt.serverBehavior
+			if tt.serverStub == nil {
+				tt.serverStub = common.NewServerStub(t)
 			}
 
-			err = os.Setenv(model.EnvKeyServerUrl, newDryRunServerStub(t, ctx, serverResponseStubs))
-			require.NoError(t, err)
-			t.Cleanup(func() {
-				_ = os.Unsetenv(model.EnvKeyServerUrl)
-			})
-
-			err = os.Setenv(model.EnvKeyAccessToken, tt.token)
-			require.NoError(t, err)
-			t.Cleanup(func() {
-				_ = os.Unsetenv(model.EnvKeyAccessToken)
-			})
-
-			err = os.Setenv(model.EnvKeySecretsPassword, secretPassword)
-			require.NoError(t, err)
-			t.Cleanup(func() {
-				_ = os.Unsetenv(model.EnvKeySecretsPassword)
-			})
+			common.NewMockWorkerServer(t,
+				tt.serverStub.
+					WithT(t).
+					WithDefaultActionsMetadataEndpoint().
+					WithGetOneEndpoint().
+					WithWorkers(&model.WorkerDetails{
+						Key: workerName,
+					}),
+			)
 
 			if tt.stdInput != "" {
-				cliIn = bytes.NewReader([]byte(tt.stdInput))
+				common.SetCliIn(bytes.NewReader([]byte(tt.stdInput)))
 				t.Cleanup(func() {
-					cliIn = os.Stdin
+					common.SetCliIn(os.Stdin)
 				})
 			}
 
 			if tt.fileInput != "" {
-				tt.commandArgs = append(tt.commandArgs, "@"+createTempFileWithContent(t, tt.fileInput))
+				tt.commandArgs = append(tt.commandArgs, "@"+common.CreateTempFileWithContent(t, tt.fileInput))
 			}
 
 			var output bytes.Buffer
 
-			cliOut = &output
+			common.SetCliOut(&output)
 			t.Cleanup(func() {
-				cliOut = os.Stdout
+				common.SetCliOut(os.Stdout)
 			})
 
 			cmd := append([]string{"worker", "dry-run"}, tt.commandArgs...)
 
 			err = runCmd(cmd...)
 
-			cancelCtx()
-
-			tt.assert(t, output.Bytes(), err, tt.serverBehavior)
+			tt.assert(t, output.Bytes(), err)
 		})
 	}
 }
 
-func assertDryRunSucceed(t *testing.T, output []byte, err error, serverBehavior *dryRunServerStubBehavior) {
-	require.NoError(t, err)
-
-	outputData := map[string]any{}
-
-	err = json.Unmarshal(output, &outputData)
-	require.NoError(t, err)
-
-	assert.Equal(t, serverBehavior.responseBody, outputData)
-}
-
-func assertDryRunFail(errorMessage string, errorMessageArgs ...any) dryRunAssertFunc {
-	return func(t *testing.T, stdOutput []byte, err error, serverResponse *dryRunServerStubBehavior) {
-		require.Error(t, err)
-		assert.EqualError(t, err, fmt.Sprintf(errorMessage, errorMessageArgs...))
-	}
-}
-
-var dryRunUrlPattern = regexp.MustCompile(`^/worker/api/v1/test/([^\s?]+)(\?.+)?$`)
-
-type dryRunServerStubBehavior struct {
-	waitFor        time.Duration
-	responseStatus int
-	responseBody   map[string]any
-	requestToken   string
-	requestBody    map[string]any
-	requestParams  map[string]string
-}
-
-type dryRunServerStub struct {
-	t     *testing.T
-	ctx   context.Context
-	stubs map[string]*dryRunServerStubBehavior
-}
-
-func newDryRunServerStub(t *testing.T, ctx context.Context, responseStubs map[string]*dryRunServerStubBehavior) string {
-	stub := dryRunServerStub{stubs: responseStubs, ctx: ctx}
-	server := httptest.NewUnstartedServer(&stub)
-	t.Cleanup(server.Close)
-	server.Start()
-	return "http:" + "//" + server.Listener.Addr().String()
-}
-
-func (s *dryRunServerStub) ServeHTTP(res http.ResponseWriter, req *http.Request) {
-	matches := dryRunUrlPattern.FindAllStringSubmatch(req.URL.Path, -1)
-	if len(matches) == 0 || len(matches[0][1]) < 1 {
-		res.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	if req.Header.Get("content-type") != "application/json" {
-		res.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	workerName := matches[0][1]
-
-	behavior, exists := s.stubs[workerName]
-	if !exists {
-		res.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	if behavior.waitFor > 0 {
-		select {
-		case <-s.ctx.Done():
-			return
-		case <-time.After(behavior.waitFor):
+func validateTestPayloadData(data any) common.BodyValidator {
+	return common.ValidateJsonFunc(data, func(in any) any {
+		var gotData any
+		if m, isMap := data.(map[string]any); isMap {
+			gotData = m
 		}
-	}
-
-	// Validate token
-	if req.Header.Get("authorization") != "Bearer "+behavior.requestToken {
-		res.WriteHeader(http.StatusForbidden)
-		return
-	}
-
-	// Validate body if requested
-	if behavior.requestBody != nil {
-		wantData, checkRequestData := behavior.responseBody["data"]
-
-		if checkRequestData {
-			gotData, err := io.ReadAll(req.Body)
-			if err != nil {
-				s.t.Logf("Read request body error: %+v", err)
-				res.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-
-			decodedData := map[string]any{}
-			err = json.Unmarshal(gotData, &decodedData)
-			if err != nil {
-				s.t.Logf("Unmarshall request body error: %+v", err)
-				res.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-
-			if !reflect.DeepEqual(wantData, decodedData) {
-				res.WriteHeader(http.StatusBadRequest)
-				return
-			}
-		}
-	}
-
-	// Validate the request params
-	for k, v := range behavior.requestParams {
-		if req.URL.Query().Get(k) != v {
-			res.WriteHeader(http.StatusBadRequest)
-			return
-		}
-	}
-
-	bodyBytes, err := json.Marshal(behavior.responseBody)
-	if err != nil {
-		s.t.Logf("Marshall error: %+v", err)
-		res.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	res.WriteHeader(behavior.responseStatus)
-	_, err = res.Write(bodyBytes)
-	if err != nil {
-		s.t.Logf("Write error: %+v", err)
-		res.WriteHeader(http.StatusInternalServerError)
-	}
+		return gotData
+	})
 }

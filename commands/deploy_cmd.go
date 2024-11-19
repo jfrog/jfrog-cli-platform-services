@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
+
 	plugins_common "github.com/jfrog/jfrog-cli-core/v2/plugins/common"
 	"github.com/jfrog/jfrog-cli-core/v2/plugins/components"
 	"github.com/jfrog/jfrog-client-go/utils/log"
@@ -35,22 +37,27 @@ func GetDeployCommand() components.Command {
 			model.GetNoSecretsFlag(),
 		},
 		Action: func(c *components.Context) error {
-			manifest, err := model.ReadManifest()
-			if err != nil {
-				return err
-			}
-
-			if err = manifest.Validate(); err != nil {
-				return err
-			}
-
 			server, err := model.GetServerDetails(c)
 			if err != nil {
 				return err
 			}
 
+			manifest, err := common.ReadManifest()
+			if err != nil {
+				return err
+			}
+
+			actionsMeta, err := common.FetchActions(c, server.GetUrl(), server.GetAccessToken(), manifest.ProjectKey)
+			if err != nil {
+				return err
+			}
+
+			if err = common.ValidateManifest(manifest, actionsMeta); err != nil {
+				return err
+			}
+
 			if !c.GetBoolFlagValue(model.FlagNoSecrets) {
-				if err = manifest.DecryptSecrets(); err != nil {
+				if err = common.DecryptManifestSecrets(manifest); err != nil {
 					return err
 				}
 			}
@@ -61,7 +68,7 @@ func GetDeployCommand() components.Command {
 }
 
 func runDeployCommand(ctx *components.Context, manifest *model.Manifest, serverUrl string, token string) error {
-	existingWorker, err := fetchWorkerDetails(ctx, serverUrl, token, manifest.Name, manifest.ProjectKey)
+	existingWorker, err := common.FetchWorkerDetails(ctx, serverUrl, token, manifest.Name, manifest.ProjectKey)
 	if err != nil {
 		return err
 	}
@@ -78,7 +85,14 @@ func runDeployCommand(ctx *components.Context, manifest *model.Manifest, serverU
 
 	if existingWorker == nil {
 		log.Info(fmt.Sprintf("Deploying worker '%s'", manifest.Name))
-		err = callWorkerApiWithOutput(ctx, serverUrl, token, http.MethodPost, bodyBytes, http.StatusCreated, nil, "workers")
+		err = common.CallWorkerApi(ctx, common.ApiCallParams{
+			Method:      http.MethodPost,
+			ServerUrl:   serverUrl,
+			ServerToken: token,
+			Body:        bodyBytes,
+			OkStatuses:  []int{http.StatusCreated},
+			Path:        []string{"workers"},
+		})
 		if err == nil {
 			log.Info(fmt.Sprintf("Worker '%s' deployed", manifest.Name))
 		}
@@ -86,7 +100,14 @@ func runDeployCommand(ctx *components.Context, manifest *model.Manifest, serverU
 	}
 
 	log.Info(fmt.Sprintf("Updating worker '%s'", manifest.Name))
-	err = callWorkerApiWithOutput(ctx, serverUrl, token, http.MethodPut, bodyBytes, http.StatusNoContent, nil, "workers")
+	err = common.CallWorkerApi(ctx, common.ApiCallParams{
+		Method:      http.MethodPut,
+		ServerUrl:   serverUrl,
+		ServerToken: token,
+		Body:        bodyBytes,
+		OkStatuses:  []int{http.StatusNoContent},
+		Path:        []string{"workers"},
+	})
 	if err == nil {
 		log.Info(fmt.Sprintf("Worker '%s' updated", manifest.Name))
 	}
@@ -95,16 +116,16 @@ func runDeployCommand(ctx *components.Context, manifest *model.Manifest, serverU
 }
 
 func prepareDeployRequest(ctx *components.Context, manifest *model.Manifest, existingWorker *model.WorkerDetails) (*deployRequest, error) {
-	sourceCode, err := manifest.ReadSourceCode()
+	sourceCode, err := common.ReadSourceCode(manifest)
 	if err != nil {
 		return nil, err
 	}
-	sourceCode = model.CleanImports(sourceCode)
+	sourceCode = common.CleanImports(sourceCode)
 
 	var secrets []*model.Secret
 
 	if !ctx.GetBoolFlagValue(model.FlagNoSecrets) {
-		secrets = prepareSecretsUpdate(manifest, existingWorker)
+		secrets = common.PrepareSecretsUpdate(manifest, existingWorker)
 	}
 
 	payload := &deployRequest{

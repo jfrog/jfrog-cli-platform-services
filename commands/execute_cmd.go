@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
+
 	"github.com/jfrog/jfrog-client-go/utils/log"
 
 	plugins_common "github.com/jfrog/jfrog-cli-core/v2/plugins/common"
@@ -31,7 +33,7 @@ func GetExecuteCommand() components.Command {
 }
 
 func runExecuteCommand(c *components.Context) error {
-	workerKey, projectKey, err := extractProjectAndKeyFromCommandContext(c, c.Arguments, 1, true)
+	workerKey, projectKey, err := common.ExtractProjectAndKeyFromCommandContext(c, c.Arguments, 1, true)
 	if err != nil {
 		return err
 	}
@@ -45,9 +47,9 @@ func runExecuteCommand(c *components.Context) error {
 		return err
 	}
 
-	inputReader := &cmdInputReader{c}
+	inputReader := common.NewInputReader(c)
 
-	data, err := inputReader.readData()
+	data, err := inputReader.ReadData()
 	if err != nil {
 		return err
 	}
@@ -57,10 +59,14 @@ func runExecuteCommand(c *components.Context) error {
 		return err
 	}
 
-	var queryParams map[string]string
-	if projectKey != "" {
-		queryParams = map[string]string{"projectKey": projectKey}
-	}
-
-	return callWorkerApiWithOutput(c, server.GetUrl(), server.GetAccessToken(), http.MethodPost, body, http.StatusOK, queryParams, "execute", workerKey)
+	return common.CallWorkerApi(c, common.ApiCallParams{
+		Method:      http.MethodPost,
+		ServerUrl:   server.GetUrl(),
+		ServerToken: server.GetAccessToken(),
+		OkStatuses:  []int{http.StatusOK},
+		Body:        body,
+		ProjectKey:  projectKey,
+		Path:        []string{"execute", workerKey},
+		OnContent:   common.PrintJson,
+	})
 }

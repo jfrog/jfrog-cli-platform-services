@@ -1,0 +1,11 @@
+{
+  "action": {
+    "application": "worker",
+    "name": "GENERIC_EVENT"
+  },
+  "description": "Generic events can execute custom code that is not triggered by any event in the JPD. You must execute these events manually through the REST API.",
+  "samplePayload": "{\"foo\":\"bar\"}",
+  "sampleCode": "\ntype CustomPayload = void;\n\ninterface CustomResponse {\n    error: string | undefined // Valued with the cause in case of error\n    repositories: Record<string, number> // A list that contains the number of repositories per repository type\n}\n\ninterface RepoData {\n    key: string\n    type: string\n    description: string\n    url: string\n    packageType: string\n}\n\nexport default async (context: PlatformContext, data: CustomPayload): Promise<CustomResponse> => {\n\n    const response = {\n        error: undefined,\n        repositories: {},\n    };\n    \n    try {\n        // Ref: https://jfrog.com/help/r/jfrog-rest-apis/get-repositories\n        const res = await context.clients.platformHttp.get('/artifactory/api/repositories');\n        if (res.status === 200) {\n            const repositories: RepoData[] = res.data;\n\n            // The number of repositories mapped by repository type\n            const repoCountRecord: Record<string, number> = {};\n\n            repositories.forEach(repository => {\n                let count = repoCountRecord[repository.type] || 0;\n                repoCountRecord[repository.type] = ++count;\n            });\n\n            response.repositories = repoCountRecord;\n            console.log(\"Repository count success\");\n        } else {\n            response.error = `Request is successful but returned an unexpected status : ${res.status}`;\n            console.warn(response.error);\n        }\n    } catch(error) {\n        response.error = `Request failed with status code ${error.status || '<none>'} caused by : ${error.message}`;\n        console.error(response.error);\n    }\n\n    return response;\n}\n",
+  "supportProjects": true,
+  "wikiUrl": "https://jfrog.com/help/r/jfrog-platform-administration-documentation/create-a-generic-worker"
+}

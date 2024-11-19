@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 	"slices"
 	"strings"
 	"testing"
@@ -36,21 +37,21 @@ func TestListCommand(t *testing.T) {
 			Description: "My worker 0",
 			Enabled:     true,
 			SourceCode:  `export default async function() { return { "status": "OK" } }`,
-			Action:      model.ActionGenericEvent,
+			Action:      "GENERIC_EVENT",
 		},
 		{
 			Key:         fmt.Sprintf("w%v", time.Now().Unix()+1),
 			Description: "My worker 1",
 			Enabled:     true,
 			SourceCode:  `export default async function() { return { "status": "OK" } }`,
-			Action:      model.ActionGenericEvent,
+			Action:      "GENERIC_EVENT",
 		},
 		{
 			Key:         fmt.Sprintf("w%v", time.Now().Unix()+2),
 			Description: "My worker 2",
 			Enabled:     true,
 			SourceCode:  `export default async function() { return { "status": "OK" } }`,
-			Action:      model.ActionBeforeDownload,
+			Action:      "BEFORE_DOWNLOAD",
 			FilterCriteria: model.FilterCriteria{
 				ArtifactFilterCriteria: model.ArtifactFilterCriteria{
 					RepoKeys: []string{"example-repo-local"},
@@ -65,7 +66,7 @@ func TestListCommand(t *testing.T) {
 		Enabled:     true,
 		Debug:       true,
 		SourceCode:  `export default async function() { return { "status": "OK" } }`,
-		Action:      model.ActionGenericEvent,
+		Action:      "GENERIC_EVENT",
 		ProjectKey:  "my-project",
 	}
 
@@ -168,8 +169,8 @@ func assertWorkerListJSON(workers ...*model.WorkerDetails) func(t require.Testin
 
 		assert.Equalf(t, len(workers), len(gotWorkers.Workers), "Length mismatch")
 
-		infra.SortWorkers(workers)
-		infra.SortWorkers(gotWorkers.Workers)
+		common.SortWorkers(workers)
+		common.SortWorkers(gotWorkers.Workers)
 
 		for i, wantWorker := range workers {
 			gotWorker := gotWorkers.Workers[i]
