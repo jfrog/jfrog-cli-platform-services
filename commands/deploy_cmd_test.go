@@ -191,15 +191,27 @@ func expectDeployRequest(actionsMeta common.ActionsMetadata, workerName, actionN
 	}
 }
 
-func getExpectedDeployRequestForAction(t require.TestingT, actionsMeta common.ActionsMetadata, workerName, actionName, projectKey string, secrets ...*model.Secret) *deployRequest {
+func getExpectedDeployRequestForAction(
+	t require.TestingT,
+	actionsMeta common.ActionsMetadata,
+	workerName, actionName, projectKey string,
+	secrets ...*model.Secret,
+) *deployRequest {
 	r := &deployRequest{
 		Key:         workerName,
 		Description: "Run a script on " + actionName,
 		Enabled:     false,
-		SourceCode:  common.CleanImports(common.GenerateFromSamples(t, templates, actionName, workerName, "", "worker.ts_template")),
-		Action:      actionName,
-		Secrets:     secrets,
-		ProjectKey:  projectKey,
+		SourceCode: common.CleanImports(common.GenerateFromSamples(
+			t,
+			templates,
+			actionName,
+			workerName,
+			"",
+			"worker.ts_template",
+		)),
+		Action:     actionName,
+		Secrets:    secrets,
+		ProjectKey: projectKey,
 	}
 
 	actionMeta, err := actionsMeta.FindAction(actionName)

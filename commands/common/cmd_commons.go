@@ -37,7 +37,10 @@ func ExtractProjectAndKeyFromCommandContext(c stringFlagAware, args []string, mi
 	if workerKey == "" || projectKey == "" {
 		manifest, err := ReadManifest()
 		if err != nil {
-			return "", "", err
+			if workerKey == "" {
+				return "", "", err
+			}
+			return workerKey, projectKey, nil
 		}
 
 		if err = ValidateManifest(manifest, nil); err != nil {

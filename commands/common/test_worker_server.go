@@ -142,7 +142,7 @@ func (s *ServerStub) WithUpdateEndpoint(validateBody BodyValidator) *ServerStub 
 	s.endpoints = append(s.endpoints,
 		mockhttp.NewServerEndpoint().
 			When(
-				mockhttp.Request().POST("/worker/api/v1/workers"),
+				mockhttp.Request().PUT("/worker/api/v1/workers"),
 			).
 			HandleWith(s.handleSave(http.StatusNoContent, validateBody)),
 	)

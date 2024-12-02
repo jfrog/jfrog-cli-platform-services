@@ -33,7 +33,7 @@ func ReadSecretPassword(prompt ...string) (string, error) {
 
 	password, err := ioutils.ScanPasswordFromConsole(message)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to read password: %w", err)
 	}
 
 	err = validateSecretPassword(password)

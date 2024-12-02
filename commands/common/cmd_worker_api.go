@@ -2,7 +2,7 @@ package common
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/jfrog/jfrog-cli-platform-services/model"
@@ -17,19 +17,23 @@ func FetchWorkerDetails(c model.IntFlagProvider, serverUrl string, accessToken s
 		Method:      http.MethodGet,
 		ServerUrl:   serverUrl,
 		ServerToken: accessToken,
-		OkStatuses:  []int{http.StatusOK},
+		OkStatuses:  []int{http.StatusOK, http.StatusNotFound},
 		ProjectKey:  projectKey,
 		Path:        []string{"workers", workerKey},
 		OnContent: func(content []byte) error {
+			if len(content) == 0 {
+				log.Debug("No worker details returned from the server")
+				return nil
+			}
 			return json.Unmarshal(content, details)
 		},
 	})
 	if err != nil {
-		var apiErr *ApiError
-		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
-			return nil, nil
-		}
-		return nil, err
+		return nil, fmt.Errorf("cannot fetch worker details: %w", err)
+	}
+
+	if details.Key == "" {
+		return nil, nil
 	}
 
 	return details, nil

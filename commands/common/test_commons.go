@@ -82,6 +82,7 @@ func GenerateFromSamples(t require.TestingT, templates embed.FS, action string, 
 		"HasRequestType":        actionMeta.ExecutionRequestType != "",
 		"ExecutionRequestType":  actionMeta.ExecutionRequestType,
 		"ProjectKey":            projectKey,
+		"SourceCode":            actionMeta.SampleCode,
 	}
 
 	usedTypes := ExtractActionUsedTypes(actionMeta)
