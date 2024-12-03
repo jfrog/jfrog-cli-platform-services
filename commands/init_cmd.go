@@ -90,7 +90,7 @@ func (c *initHandler) initWorker(targetDir string, action string, workerName str
 	actionMeta, err := actionsMeta.FindAction(action, application)
 	if err != nil {
 		log.Debug(fmt.Sprintf("Cannot not find action '%s': %+v", action, err))
-		return fmt.Errorf("invalid action '%s' action should be one of: %s", action, actionsMeta.ActionsNames())
+		return err
 	}
 
 	generate := c.initGenerator(targetDir, workerName, projectKey, force, skipTests, actionMeta)

@@ -42,7 +42,11 @@ func (c ActionsMetadata) FindAction(actionName string, service ...string) (*mode
 		return nil, fmt.Errorf("%d actions found with name '%s', please specify an application", len(match), actionName)
 	}
 
-	return nil, fmt.Errorf("action '%s' not found", actionName)
+	if application != "" {
+		return nil, fmt.Errorf("action '%s' not found for application '%s'", actionName, application)
+	}
+
+	return nil, fmt.Errorf("action '%s' not found. It should be one of %s", actionName, c.ActionsNames())
 }
 
 func (c ActionsMetadata) ActionNeedsCriteria(actionName string, service ...string) bool {
