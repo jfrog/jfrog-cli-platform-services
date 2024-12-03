@@ -118,6 +118,10 @@ func TestExtractTypescriptTypes(t *testing.T) {
 			want:  []string{"BeforePropertyDeleteResponse", "BeforePropertyDeleteRequest", "BeforePropertyDeleteStatus"},
 		},
 		{
+			event: "BEFORE_REMOTE_INFO",
+			want:  []string{"BeforeRemoteInfoRequest", "BeforeRemoteInfoResponse", "ActionStatus", "Header"},
+		},
+		{
 			event: "GENERIC_EVENT",
 			want:  []string{"CustomPayload", "CustomResponse", "Record", "RepoData"},
 		},
@@ -196,6 +200,10 @@ func TestExtractActionUsedTypes(t *testing.T) {
 		{
 			event: "BEFORE_PROPERTY_DELETE",
 			want:  []string{"BeforePropertyDeleteResponse", "BeforePropertyDeleteRequest", "BeforePropertyDeleteStatus"},
+		},
+		{
+			event: "BEFORE_REMOTE_INFO",
+			want:  []string{"BeforeRemoteInfoRequest", "BeforeRemoteInfoResponse", "ActionStatus", "Header"},
 		},
 		{
 			event: "GENERIC_EVENT",

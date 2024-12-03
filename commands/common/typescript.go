@@ -9,12 +9,13 @@ import (
 )
 
 var (
-	tsNewInstancePattern   = regexp.MustCompile(`new\s+([A-Z][a-zA-Z0-9]+)\(`)
-	tsFieldTypePattern     = regexp.MustCompile(`[a-zA-Z0-9]+\s*:\s*([A-Z][a-zA-Z0-9]+)`)
-	tsFieldAccessPattern   = regexp.MustCompile(`\W([A-Z][a-zA-Z0-9]+)\.[a-zA-Z0-9]+`)
-	tsTypeInTypeParameters = regexp.MustCompile(`<([A-Z][a-zA-Z0-9]+)>`)
-	tsExcludeTypes         = []string{"PlatformContext"}
-	tsUnexportedType       = regexp.MustCompile(`^(class|type|interface|enum|const)\s+[A-Za-z_$][0-9A-Za-z_$]*`)
+	tsNewInstancePattern        = regexp.MustCompile(`new\s+([A-Z][a-zA-Z0-9]+)\(`)
+	tsFieldTypePattern          = regexp.MustCompile(`[a-zA-Z0-9]+\s*:\s*([A-Z][a-zA-Z0-9]+)`)
+	tsFieldDeconstructedPattern = regexp.MustCompile(`\[[^]]+]\s*:\s*([A-Z][a-zA-Z0-9]+)`)
+	tsFieldAccessPattern        = regexp.MustCompile(`\W([A-Z][a-zA-Z0-9]+)\.[a-zA-Z0-9]+`)
+	tsTypeInTypeParameters      = regexp.MustCompile(`<([A-Z][a-zA-Z0-9]+)>`)
+	tsExcludeTypes              = []string{"PlatformContext"}
+	tsUnexportedType            = regexp.MustCompile(`^(class|type|interface|enum|const)\s+[A-Za-z_$][0-9A-Za-z_$]*`)
 )
 
 // AddExportToTypesDeclarations Add export to (interface, class, enum, type) XXX found in the source.
@@ -53,6 +54,7 @@ func ExtractUsedTypes(tsSource string) []string {
 	extractTypesByPattern(tsFieldTypePattern, tsSource, handleMatch)
 	extractTypesByPattern(tsFieldAccessPattern, tsSource, handleMatch)
 	extractTypesByPattern(tsTypeInTypeParameters, tsSource, handleMatch)
+	extractTypesByPattern(tsFieldDeconstructedPattern, tsSource, handleMatch)
 
 	slices.Sort(types)
 
