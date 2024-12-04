@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -72,7 +74,7 @@ func removeTestSpec(tc removeTestCase) infra.TestDefinition {
 			if tc.wantErr == nil {
 				require.NoError(it, err)
 
-				mf, err := model.ReadManifest()
+				mf, err := common.ReadManifest()
 				require.NoError(it, err)
 
 				assertWorkerRemoved(it, mf)

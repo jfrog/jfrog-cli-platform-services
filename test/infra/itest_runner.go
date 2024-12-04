@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
+
 	"github.com/jfrog/jfrog-cli-platform-services/model"
 
 	"github.com/google/uuid"
@@ -22,8 +24,6 @@ import (
 	"github.com/jfrog/jfrog-cli-core/v2/utils/config"
 	"github.com/jfrog/jfrog-cli-core/v2/utils/coreutils"
 	"github.com/stretchr/testify/require"
-
-	"github.com/jfrog/jfrog-cli-platform-services/commands"
 )
 
 type TestFunction func(it *Test)
@@ -120,17 +120,17 @@ func runTest(t *testing.T, testSpec TestDefinition) {
 	}
 
 	if testSpec.Input != "" {
-		commands.SetCliIn(bytes.NewReader([]byte(testSpec.Input)))
+		common.SetCliIn(bytes.NewReader([]byte(testSpec.Input)))
 		t.Cleanup(func() {
-			commands.SetCliIn(os.Stdin)
+			common.SetCliIn(os.Stdin)
 		})
 	}
 
 	if testSpec.CaptureOutput {
 		var newOutput bytes.Buffer
-		commands.SetCliOut(&newOutput)
+		common.SetCliOut(&newOutput)
 		t.Cleanup(func() {
-			commands.SetCliOut(os.Stdout)
+			common.SetCliOut(os.Stdout)
 		})
 		it.output = &newOutput
 	}

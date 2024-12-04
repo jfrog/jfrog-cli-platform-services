@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
+
 	plugins_common "github.com/jfrog/jfrog-cli-core/v2/plugins/common"
 	"github.com/jfrog/jfrog-cli-core/v2/plugins/components"
 	"github.com/jfrog/jfrog-client-go/utils/log"
@@ -28,7 +30,7 @@ func GetRemoveCommand() components.Command {
 }
 
 func runRemoveCommand(c *components.Context) error {
-	workerKey, _, err := extractProjectAndKeyFromCommandContext(c, c.Arguments, 0, false)
+	workerKey, _, err := common.ExtractProjectAndKeyFromCommandContext(c, c.Arguments, 0, false)
 	if err != nil {
 		return err
 	}
@@ -40,7 +42,13 @@ func runRemoveCommand(c *components.Context) error {
 
 	log.Info(fmt.Sprintf("Removing worker '%s' ...", workerKey))
 
-	err = callWorkerApiSilent(c, server.GetUrl(), server.GetAccessToken(), http.MethodDelete, nil, http.StatusNoContent, nil, "workers", workerKey)
+	err = common.CallWorkerApi(c, common.ApiCallParams{
+		Method:      http.MethodDelete,
+		ServerUrl:   server.GetUrl(),
+		ServerToken: server.GetAccessToken(),
+		OkStatuses:  []int{http.StatusNoContent},
+		Path:        []string{"workers", workerKey},
+	})
 	if err == nil {
 		log.Info(fmt.Sprintf("Worker '%s' removed", workerKey))
 	}

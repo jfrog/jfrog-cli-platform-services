@@ -1,14 +1,15 @@
+//go:build test
+// +build test
+
 package commands
 
 import (
-	"context"
-	"errors"
-	"net/http"
-	"net/http/httptest"
+	"bytes"
 	"os"
-	"regexp"
 	"testing"
 	"time"
+
+	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,52 +21,52 @@ func TestRemoveCommand(t *testing.T) {
 	tests := []struct {
 		name           string
 		commandArgs    []string
-		token          string
 		workerAction   string
 		workerName     string
 		patchManifest  func(mf *model.Manifest)
-		serverBehavior removeServerStubBehavior
-		wantErr        error
+		serverBehavior *common.ServerStub
+		assert         common.AssertOutputFunc
 	}{
 		{
 			name:         "undeploy from manifest",
 			workerAction: "BEFORE_UPLOAD",
 			workerName:   "wk-0",
-			serverBehavior: removeServerStubBehavior{
-				wantWorkerKey: "wk-0",
-			},
+			serverBehavior: common.NewServerStub(t).
+				WithWorkers(&model.WorkerDetails{Key: "wk-0"}).
+				WithDeleteEndpoint(),
 		},
 		{
 			name:        "undeploy from key",
 			workerName:  "wk-1",
 			commandArgs: []string{"wk-1"},
-			serverBehavior: removeServerStubBehavior{
-				wantWorkerKey: "wk-1",
-			},
+			serverBehavior: common.NewServerStub(t).
+				WithWorkers(&model.WorkerDetails{Key: "wk-1"}).
+				WithDeleteEndpoint(),
 		},
 		{
 			name:        "fails if timeout exceeds",
 			commandArgs: []string{"--" + model.FlagTimeout, "500"},
-			serverBehavior: removeServerStubBehavior{
-				waitFor: 5 * time.Second,
-			},
-			wantErr: errors.New("request timed out after 500ms"),
+			serverBehavior: common.NewServerStub(t).
+				WithDelay(2 * time.Second).
+				WithDeleteEndpoint(),
+			assert: common.AssertOutputError("request timed out after 500ms"),
 		},
 		{
 			name:        "fails if invalid timeout",
 			commandArgs: []string{"--" + model.FlagTimeout, "abc"},
-			wantErr:     errors.New("invalid timeout provided"),
+			assert:      common.AssertOutputError("invalid timeout provided"),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancelCtx := context.WithCancel(context.Background())
-			t.Cleanup(cancelCtx)
+			if tt.serverBehavior != nil {
+				common.NewMockWorkerServer(t, tt.serverBehavior.WithT(t).WithDefaultActionsMetadataEndpoint())
+			}
 
-			runCmd := createCliRunner(t, GetInitCommand(), GetRemoveCommand())
+			runCmd := common.CreateCliRunner(t, GetInitCommand(), GetRemoveCommand())
 
-			_, workerName := prepareWorkerDirForTest(t)
+			_, workerName := common.PrepareWorkerDirForTest(t)
 			if tt.workerName != "" {
 				workerName = tt.workerName
 			}
@@ -79,108 +80,24 @@ func TestRemoveCommand(t *testing.T) {
 			require.NoError(t, err)
 
 			if tt.patchManifest != nil {
-				patchManifest(t, tt.patchManifest)
+				common.PatchManifest(t, tt.patchManifest)
 			}
 
-			err = os.Setenv(model.EnvKeyServerUrl, newRemoveServerStub(t, ctx, &tt.serverBehavior))
-			require.NoError(t, err)
+			var output bytes.Buffer
+			common.SetCliOut(&output)
 			t.Cleanup(func() {
-				_ = os.Unsetenv(model.EnvKeyServerUrl)
-			})
-
-			if tt.token == "" && tt.serverBehavior.wantBearerToken == "" {
-				tt.token = t.Name()
-				tt.serverBehavior.wantBearerToken = t.Name()
-			}
-
-			err = os.Setenv(model.EnvKeyAccessToken, tt.token)
-			require.NoError(t, err)
-			t.Cleanup(func() {
-				_ = os.Unsetenv(model.EnvKeyAccessToken)
+				common.SetCliOut(os.Stdout)
 			})
 
 			cmd := append([]string{"worker", "undeploy"}, tt.commandArgs...)
 
 			err = runCmd(cmd...)
 
-			cancelCtx()
-
-			if tt.wantErr == nil {
+			if tt.assert == nil {
 				assert.NoError(t, err)
 			} else {
-				assert.EqualError(t, tt.wantErr, err.Error())
+				tt.assert(t, output.Bytes(), err)
 			}
 		})
 	}
-}
-
-var removeUrlPattern = regexp.MustCompile(`^/worker/api/v1/workers/([\S/]+)$`)
-
-type removeServerStubBehavior struct {
-	waitFor         time.Duration
-	responseStatus  int
-	wantBearerToken string
-	wantWorkerKey   string
-	requestParams   map[string]string
-}
-
-type removeServerStub struct {
-	t        *testing.T
-	ctx      context.Context
-	behavior *removeServerStubBehavior
-}
-
-func newRemoveServerStub(t *testing.T, ctx context.Context, behavior *removeServerStubBehavior) string {
-	stub := removeServerStub{t: t, behavior: behavior, ctx: ctx}
-	server := httptest.NewUnstartedServer(&stub)
-	t.Cleanup(server.Close)
-	server.Start()
-	return "http:" + "//" + server.Listener.Addr().String()
-}
-
-func (s *removeServerStub) ServeHTTP(res http.ResponseWriter, req *http.Request) {
-	urlMatch := removeUrlPattern.FindAllStringSubmatch(req.URL.Path, -1)
-	if len(urlMatch) == 0 && len(urlMatch[0]) < 2 {
-		res.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	if s.behavior.wantWorkerKey != "" && s.behavior.wantWorkerKey != urlMatch[0][1] {
-		res.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	if s.behavior.waitFor > 0 {
-		select {
-		case <-s.ctx.Done():
-			return
-		case <-time.After(s.behavior.waitFor):
-		}
-	}
-
-	if req.Method != http.MethodDelete {
-		res.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Validate token
-	if req.Header.Get("authorization") != "Bearer "+s.behavior.wantBearerToken {
-		res.WriteHeader(http.StatusForbidden)
-		return
-	}
-
-	// Validate the request params
-	for k, v := range s.behavior.requestParams {
-		if req.URL.Query().Get(k) != v {
-			res.WriteHeader(http.StatusBadRequest)
-			return
-		}
-	}
-
-	if s.behavior.responseStatus > 0 {
-		res.WriteHeader(s.behavior.responseStatus)
-		return
-	}
-
-	res.WriteHeader(http.StatusNoContent)
 }

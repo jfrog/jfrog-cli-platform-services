@@ -1,17 +1,16 @@
+//go:build test
+// +build test
+
 package commands
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
-	"net/http/httptest"
-	"os"
-	"regexp"
 	"testing"
 	"time"
+
+	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,13 +19,15 @@ import (
 )
 
 func TestDeployCommand(t *testing.T) {
+	actionsMeta := common.LoadSampleActions(t)
+
 	tests := []struct {
 		name           string
 		commandArgs    []string
 		token          string
 		workerAction   string
 		workerName     string
-		serverBehavior deployServerStubBehavior
+		serverBehavior *common.ServerStub
 		wantErr        error
 		patchManifest  func(mf *model.Manifest)
 	}{
@@ -34,21 +35,22 @@ func TestDeployCommand(t *testing.T) {
 			name:         "create",
 			workerAction: "BEFORE_UPLOAD",
 			workerName:   "wk-0",
-			serverBehavior: deployServerStubBehavior{
-				wantMethods: []string{http.MethodGet, http.MethodPost},
-				wantRequestBody: getExpectedDeployRequestForAction(
-					t,
-					"wk-0",
-					"BEFORE_UPLOAD",
-					"",
-					&model.Secret{Key: "sec-1", Value: "val-1"},
-					&model.Secret{Key: "sec-2", Value: "val-2"},
+			serverBehavior: common.NewServerStub(t).
+				WithGetOneEndpoint().
+				WithCreateEndpoint(
+					expectDeployRequest(
+						actionsMeta,
+						"wk-0",
+						"BEFORE_UPLOAD",
+						"",
+						&model.Secret{Key: "sec-1", Value: "val-1"},
+						&model.Secret{Key: "sec-2", Value: "val-2"},
+					),
 				),
-			},
 			patchManifest: func(mf *model.Manifest) {
 				mf.Secrets = model.Secrets{
-					"sec-1": mustEncryptSecret(t, "val-1"),
-					"sec-2": mustEncryptSecret(t, "val-2"),
+					"sec-1": common.MustEncryptSecret(t, "val-1"),
+					"sec-2": common.MustEncryptSecret(t, "val-2"),
 				}
 			},
 		},
@@ -56,43 +58,53 @@ func TestDeployCommand(t *testing.T) {
 			name:         "update",
 			workerAction: "GENERIC_EVENT",
 			workerName:   "wk-1",
-			serverBehavior: deployServerStubBehavior{
-				wantMethods:     []string{http.MethodGet, http.MethodPut},
-				wantRequestBody: getExpectedDeployRequestForAction(t, "wk-1", "GENERIC_EVENT", ""),
-				existingWorkers: map[string]*model.WorkerDetails{
-					"wk-1": {},
-				},
-			},
+			serverBehavior: common.NewServerStub(t).
+				WithGetOneEndpoint().
+				WithUpdateEndpoint(
+					expectDeployRequest(actionsMeta, "wk-1", "GENERIC_EVENT", ""),
+				).
+				WithWorkers(&model.WorkerDetails{
+					Key: "wk-1",
+				}),
 		},
 		{
 			name:         "update with removed secrets",
 			workerAction: "AFTER_MOVE",
 			workerName:   "wk-2",
-			serverBehavior: deployServerStubBehavior{
-				wantMethods:     []string{http.MethodGet, http.MethodPut},
-				wantRequestBody: getExpectedDeployRequestForAction(t, "wk-2", "AFTER_MOVE", "", &model.Secret{Key: "sec-1", MarkedForRemoval: true}, &model.Secret{Key: "sec-1", Value: "val-1"}, &model.Secret{Key: "sec-2", MarkedForRemoval: true}),
-				existingWorkers: map[string]*model.WorkerDetails{
-					"wk-2": {
-						Secrets: []*model.Secret{
-							{Key: "sec-1"}, {Key: "sec-2"},
-						},
+			serverBehavior: common.NewServerStub(t).
+				WithGetOneEndpoint().
+				WithUpdateEndpoint(
+					expectDeployRequest(
+						actionsMeta,
+						"wk-2",
+						"AFTER_MOVE",
+						"",
+						&model.Secret{Key: "sec-1", MarkedForRemoval: true},
+						&model.Secret{Key: "sec-1", Value: "val-1"},
+						&model.Secret{Key: "sec-2", MarkedForRemoval: true},
+					),
+				).
+				WithWorkers(&model.WorkerDetails{
+					Key: "wk-2",
+					Secrets: []*model.Secret{
+						{Key: "sec-1"}, {Key: "sec-2"},
 					},
-				},
-			},
+				}),
 			patchManifest: func(mf *model.Manifest) {
 				mf.Secrets = model.Secrets{
-					"sec-1": mustEncryptSecret(t, "val-1"),
+					"sec-1": common.MustEncryptSecret(t, "val-1"),
 				}
 			},
 		},
 		{
-			name:         "update with project key",
+			name:         "create with project key",
 			workerAction: "GENERIC_EVENT",
 			workerName:   "wk-1",
-			serverBehavior: deployServerStubBehavior{
-				wantMethods:     []string{http.MethodGet, http.MethodPost},
-				wantRequestBody: getExpectedDeployRequestForAction(t, "wk-1", "GENERIC_EVENT", "proj-1"),
-			},
+			serverBehavior: common.NewServerStub(t).
+				WithGetOneEndpoint().
+				WithCreateEndpoint(
+					expectDeployRequest(actionsMeta, "wk-1", "GENERIC_EVENT", "proj-1"),
+				),
 			patchManifest: func(mf *model.Manifest) {
 				mf.ProjectKey = "proj-1"
 			},
@@ -100,26 +112,26 @@ func TestDeployCommand(t *testing.T) {
 		{
 			name:        "fails if timeout exceeds",
 			commandArgs: []string{"--" + model.FlagTimeout, "500"},
-			serverBehavior: deployServerStubBehavior{
-				waitFor: 5 * time.Second,
-			},
+			serverBehavior: common.NewServerStub(t).
+				WithDelay(1 * time.Second).
+				WithCreateEndpoint(nil),
 			wantErr: errors.New("request timed out after 500ms"),
 		},
 		{
-			name:        "fails if invalid timeout",
-			commandArgs: []string{"--" + model.FlagTimeout, "abc"},
-			wantErr:     errors.New("invalid timeout provided"),
+			name:           "fails if invalid timeout",
+			serverBehavior: common.NewServerStub(t),
+			commandArgs:    []string{"--" + model.FlagTimeout, "abc"},
+			wantErr:        errors.New("invalid timeout provided"),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancelCtx := context.WithCancel(context.Background())
-			t.Cleanup(cancelCtx)
+			common.NewMockWorkerServer(t, tt.serverBehavior.WithT(t).WithDefaultActionsMetadataEndpoint())
 
-			runCmd := createCliRunner(t, GetInitCommand(), GetDeployCommand())
+			runCmd := common.CreateCliRunner(t, GetInitCommand(), GetDeployCommand())
 
-			_, workerName := prepareWorkerDirForTest(t)
+			_, workerName := common.PrepareWorkerDirForTest(t)
 			if tt.workerName != "" {
 				workerName = tt.workerName
 			}
@@ -133,37 +145,12 @@ func TestDeployCommand(t *testing.T) {
 			require.NoError(t, err)
 
 			if tt.patchManifest != nil {
-				patchManifest(t, tt.patchManifest)
+				common.PatchManifest(t, tt.patchManifest)
 			}
-
-			err = os.Setenv(model.EnvKeyServerUrl, newDeployServerStub(t, ctx, &tt.serverBehavior))
-			require.NoError(t, err)
-			t.Cleanup(func() {
-				_ = os.Unsetenv(model.EnvKeyServerUrl)
-			})
-
-			err = os.Setenv(model.EnvKeySecretsPassword, secretPassword)
-			require.NoError(t, err)
-			t.Cleanup(func() {
-				_ = os.Unsetenv(model.EnvKeySecretsPassword)
-			})
-
-			if tt.token == "" && tt.serverBehavior.wantBearerToken == "" {
-				tt.token = t.Name()
-				tt.serverBehavior.wantBearerToken = t.Name()
-			}
-
-			err = os.Setenv(model.EnvKeyAccessToken, tt.token)
-			require.NoError(t, err)
-			t.Cleanup(func() {
-				_ = os.Unsetenv(model.EnvKeyAccessToken)
-			})
 
 			cmd := append([]string{"worker", "deploy"}, tt.commandArgs...)
 
 			err = runCmd(cmd...)
-
-			cancelCtx()
 
 			if tt.wantErr == nil {
 				assert.NoError(t, err)
@@ -172,142 +159,6 @@ func TestDeployCommand(t *testing.T) {
 			}
 		})
 	}
-}
-
-var deployUrlPattern = regexp.MustCompile(`^/worker/api/v1/workers(/[\S/]+)?$`)
-
-type deployServerStubBehavior struct {
-	waitFor         time.Duration
-	responseStatus  int
-	wantBearerToken string
-	wantProjectKey  string
-	wantRequestBody *deployRequest
-	wantMethods     []string
-	existingWorkers map[string]*model.WorkerDetails
-}
-
-type deployServerStub struct {
-	t        *testing.T
-	ctx      context.Context
-	behavior *deployServerStubBehavior
-}
-
-func newDeployServerStub(t *testing.T, ctx context.Context, behavior *deployServerStubBehavior) string {
-	stub := deployServerStub{t: t, behavior: behavior, ctx: ctx}
-	server := httptest.NewUnstartedServer(&stub)
-	t.Cleanup(server.Close)
-	server.Start()
-	return "http:" + "//" + server.Listener.Addr().String()
-}
-
-func (s *deployServerStub) ServeHTTP(res http.ResponseWriter, req *http.Request) {
-	urlMatch := deployUrlPattern.FindAllStringSubmatch(req.URL.Path, -1)
-	if len(urlMatch) == 0 {
-		res.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	if s.behavior.waitFor > 0 {
-		select {
-		case <-s.ctx.Done():
-			return
-		case <-time.After(s.behavior.waitFor):
-		}
-	}
-
-	// Validate the projectKey
-	if s.behavior.wantProjectKey != "" {
-		gotProjectKey := req.URL.Query().Get("projectKey")
-		if gotProjectKey != s.behavior.wantProjectKey {
-			s.t.Logf("Invalid projectKey want='%s', got='%s'", s.behavior.wantProjectKey, gotProjectKey)
-			res.WriteHeader(http.StatusBadRequest)
-			return
-		}
-	}
-
-	// Validate method
-	var methodValid bool
-	for _, wantMethod := range s.behavior.wantMethods {
-		if methodValid = wantMethod == req.Method; methodValid {
-			break
-		}
-	}
-
-	if !methodValid {
-		res.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Validate token
-	if req.Header.Get("authorization") != "Bearer "+s.behavior.wantBearerToken {
-		res.WriteHeader(http.StatusForbidden)
-		return
-	}
-
-	if s.behavior.responseStatus > 0 {
-		res.WriteHeader(s.behavior.responseStatus)
-		return
-	}
-
-	if http.MethodGet != req.Method {
-		if req.Header.Get("content-type") != "application/json" {
-			res.WriteHeader(http.StatusBadRequest)
-			return
-		}
-
-		// Validate body if requested
-		if s.behavior.wantRequestBody != nil {
-			gotData, err := io.ReadAll(req.Body)
-			if err != nil {
-				s.t.Logf("Read request body error: %+v", err)
-				res.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-
-			gotRequestBody := deployRequest{}
-			err = json.Unmarshal(gotData, &gotRequestBody)
-			if err != nil {
-				s.t.Logf("Unmarshall request body error: %+v", err)
-				res.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-
-			assertDeployRequestEquals(s.t, s.behavior.wantRequestBody, &gotRequestBody)
-		}
-	}
-
-	if http.MethodGet == req.Method {
-		var workerKey string
-
-		if len(urlMatch[0]) < 1 {
-			res.WriteHeader(http.StatusNotFound)
-			return
-		} else {
-			workerKey = urlMatch[0][1][1:]
-		}
-
-		workerDetails, workerExists := s.behavior.existingWorkers[workerKey]
-		if !workerExists {
-			res.WriteHeader(http.StatusNotFound)
-			return
-		}
-
-		res.WriteHeader(http.StatusOK)
-		_, err := res.Write([]byte(mustJsonMarshal(s.t, workerDetails)))
-		require.NoError(s.t, err)
-		return
-	}
-
-	// Assume updated or created
-	if http.MethodPut == req.Method {
-		res.WriteHeader(http.StatusNoContent)
-		return
-	} else if http.MethodPost == req.Method {
-		res.WriteHeader(http.StatusCreated)
-		return
-	}
-
-	res.WriteHeader(http.StatusMethodNotAllowed)
 }
 
 func assertDeployRequestEquals(t require.TestingT, want, got *deployRequest) {
@@ -330,18 +181,43 @@ func assertDeployRequestEquals(t require.TestingT, want, got *deployRequest) {
 	assert.ElementsMatchf(t, wantSecrets, gotSecrets, "Secrets mismatch")
 }
 
-func getExpectedDeployRequestForAction(t require.TestingT, workerName, actionName, projectKey string, secrets ...*model.Secret) *deployRequest {
+func expectDeployRequest(actionsMeta common.ActionsMetadata, workerName, actionName, projectKey string, secrets ...*model.Secret) common.BodyValidator {
+	return func(t require.TestingT, body []byte) {
+		want := getExpectedDeployRequestForAction(t, actionsMeta, workerName, actionName, projectKey, secrets...)
+		got := &deployRequest{}
+		err := json.Unmarshal(body, got)
+		require.NoError(t, err)
+		assertDeployRequestEquals(t, want, got)
+	}
+}
+
+func getExpectedDeployRequestForAction(
+	t require.TestingT,
+	actionsMeta common.ActionsMetadata,
+	workerName, actionName, projectKey string,
+	secrets ...*model.Secret,
+) *deployRequest {
 	r := &deployRequest{
 		Key:         workerName,
 		Description: "Run a script on " + actionName,
 		Enabled:     false,
-		SourceCode:  model.CleanImports(getActionSourceCode(t, actionName)),
-		Action:      actionName,
-		Secrets:     secrets,
-		ProjectKey:  projectKey,
+		SourceCode: common.CleanImports(common.GenerateFromSamples(
+			t,
+			templates,
+			actionName,
+			workerName,
+			"",
+			"worker.ts_template",
+		)),
+		Action:     actionName,
+		Secrets:    secrets,
+		ProjectKey: projectKey,
 	}
 
-	if model.ActionNeedsCriteria(actionName) {
+	actionMeta, err := actionsMeta.FindAction(actionName)
+	require.NoError(t, err)
+
+	if actionMeta.MandatoryFilter && actionMeta.FilterType == model.FilterTypeRepo {
 		r.FilterCriteria = model.FilterCriteria{
 			ArtifactFilterCriteria: model.ArtifactFilterCriteria{
 				RepoKeys: []string{"example-repo-local"},

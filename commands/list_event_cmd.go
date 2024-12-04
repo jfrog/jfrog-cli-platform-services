@@ -1,7 +1,9 @@
 package commands
 
 import (
-	"net/http"
+	"strings"
+
+	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 
 	plugins_common "github.com/jfrog/jfrog-cli-core/v2/plugins/common"
 	"github.com/jfrog/jfrog-cli-core/v2/plugins/components"
@@ -27,12 +29,17 @@ func GetListEventsCommand() components.Command {
 
 			projectKey := c.GetStringFlagValue(model.FlagProjectKey)
 
-			var queryParams map[string]string
-			if projectKey != "" {
-				queryParams = map[string]string{"projectKey": projectKey}
+			actionsMeta, err := common.FetchActions(c, server.Url, server.AccessToken, projectKey)
+			if err != nil {
+				return err
 			}
 
-			return callWorkerApiWithOutput(c, server.GetUrl(), server.GetAccessToken(), http.MethodGet, nil, http.StatusOK, queryParams, "actions")
+			var actions []string
+			for _, md := range actionsMeta {
+				actions = append(actions, md.Action.Name)
+			}
+
+			return common.Print("%s", strings.Join(actions, ", "))
 		},
 	}
 }

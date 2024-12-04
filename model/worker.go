@@ -1,7 +1,10 @@
 package model
 
-import "strings"
-
+type Secret struct {
+	Key              string `json:"key"`
+	Value            string `json:"value"`
+	MarkedForRemoval bool   `json:"markedForRemoval"`
+}
 type WorkerDetails struct {
 	Key            string         `json:"key"`
 	Description    string         `json:"description"`
@@ -12,15 +15,4 @@ type WorkerDetails struct {
 	FilterCriteria FilterCriteria `json:"filterCriteria,omitempty"`
 	Secrets        []*Secret      `json:"secrets"`
 	ProjectKey     string         `json:"projectKey"`
-}
-
-func (w *WorkerDetails) KeyWithProject() string {
-	projectKey := strings.TrimSpace(w.ProjectKey)
-	if projectKey != "" {
-		projectPrefix := projectKey + "-"
-		if !strings.HasPrefix(w.Key, projectPrefix) {
-			return projectPrefix + w.Key
-		}
-	}
-	return w.Key
 }

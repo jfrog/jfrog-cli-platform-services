@@ -49,7 +49,7 @@ build::
 
 build-install:: build
 	mkdir -p "${HOME}/.jfrog/plugins/worker-qa/bin"
-	mv ${BINARY_CLI}/worker-cli-plugin "${HOME}/.jfrog/plugins/worker-qa/bin/worker-qa"
+	mv -f ${BINARY_CLI}/worker-cli-plugin "${HOME}/.jfrog/plugins/worker-qa/bin/worker-qa"
 	chmod +x "${HOME}/.jfrog/plugins/worker-qa/bin/worker-qa"
 
 .PHONY: $(MAKECMDGOALS)

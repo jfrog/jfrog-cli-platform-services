@@ -10,7 +10,7 @@ linters:
     disable-all: true
     enable:
         - errcheck
-        - exportloopref
+        - copyloopvar
         # - depguard
         #    - gci
         - gofumpt
@@ -19,7 +19,6 @@ linters:
         - govet
         - ineffassign
         - makezero
-        - megacheck
         - misspell
         - noctx
         - nolintlint
@@ -31,11 +30,19 @@ linters:
         - unconvert
         - unused
         - wastedassign
+        - gosec
 
 linters-settings:
     staticcheck:
         # https://staticcheck.io/docs/options#checks
         checks: [ "all","-SA1019","-SA1029" ]
+    gosec:
+        excludes: ["G204", "G301", "G302", "G304", "G306", "G601", "G101", "G407"]
+        exclude-generated: true
+        exclude-test-files: true
+        config:
+            global:
+                nosec: true
 
 issues:
     exclude-use-default: false

@@ -1,9 +1,14 @@
+//go:build test
+// +build test
+
 package commands
 
 import (
 	"fmt"
 	"os"
 	"testing"
+
+	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,10 +33,10 @@ func TestAddSecretCmd(t *testing.T) {
 			name:           "add",
 			secretName:     "sec-1",
 			secretValue:    "val-1",
-			secretPassword: secretPassword,
+			secretPassword: common.SecretPassword,
 			patchManifest: func(mf *model.Manifest) {
 				mf.Secrets = model.Secrets{
-					"sec-2": mustEncryptSecret(t, "val-2"),
+					"sec-2": common.MustEncryptSecret(t, "val-2"),
 				}
 			},
 			assert: assertSecrets(model.Secrets{
@@ -43,7 +48,7 @@ func TestAddSecretCmd(t *testing.T) {
 			name:           "add with nil manifest",
 			secretName:     "sec-1",
 			secretValue:    "val-1",
-			secretPassword: secretPassword,
+			secretPassword: common.SecretPassword,
 			patchManifest: func(mf *model.Manifest) {
 				mf.Secrets = nil
 			},
@@ -55,9 +60,9 @@ func TestAddSecretCmd(t *testing.T) {
 			name:           "add with different password",
 			secretName:     "sec-1",
 			secretValue:    "val-1",
-			secretPassword: secretPassword,
+			secretPassword: common.SecretPassword,
 			patchManifest: func(mf *model.Manifest) {
-				mf.Secrets["sec-2"] = mustEncryptSecret(t, "val-2", "other-password")
+				mf.Secrets["sec-2"] = common.MustEncryptSecret(t, "val-2", "other-password")
 			},
 			wantErr: "others secrets are encrypted with a different password, please use the same one",
 		},
@@ -65,11 +70,11 @@ func TestAddSecretCmd(t *testing.T) {
 			name:           "edit secret",
 			secretName:     "sec-1",
 			secretValue:    "val-1",
-			secretPassword: secretPassword,
+			secretPassword: common.SecretPassword,
 			commandArgs:    []string{fmt.Sprintf("--%s", model.FlagEdit)},
 			patchManifest: func(mf *model.Manifest) {
 				mf.Secrets = model.Secrets{
-					"sec-1": mustEncryptSecret(t, "val-1-before"),
+					"sec-1": common.MustEncryptSecret(t, "val-1-before"),
 				}
 			},
 			assert: assertSecrets(model.Secrets{"sec-1": "val-1"}),
@@ -78,10 +83,10 @@ func TestAddSecretCmd(t *testing.T) {
 			name:           "fails if the secret exists",
 			secretName:     "sec-1",
 			secretValue:    "val-1",
-			secretPassword: secretPassword,
+			secretPassword: common.SecretPassword,
 			patchManifest: func(mf *model.Manifest) {
 				mf.Secrets = model.Secrets{
-					"sec-1": mustEncryptSecret(t, "val-1-before"),
+					"sec-1": common.MustEncryptSecret(t, "val-1-before"),
 				}
 			},
 			wantErr: "sec-1 already exists, use --edit to overwrite",
@@ -94,15 +99,17 @@ func TestAddSecretCmd(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			workerDir, workerName := prepareWorkerDirForTest(t)
+			common.NewMockWorkerServer(t, common.NewServerStub(t).WithDefaultActionsMetadataEndpoint())
 
-			runCmd := createCliRunner(t, GetInitCommand(), GetAddSecretCommand())
+			workerDir, workerName := common.PrepareWorkerDirForTest(t)
+
+			runCmd := common.CreateCliRunner(t, GetInitCommand(), GetAddSecretCommand())
 
 			err := runCmd("worker", "init", "GENERIC_EVENT", workerName)
 			require.NoError(t, err)
 
 			if tt.patchManifest != nil {
-				patchManifest(t, tt.patchManifest)
+				common.PatchManifest(t, tt.patchManifest)
 			}
 
 			if tt.secretPassword != "" {
@@ -121,7 +128,7 @@ func TestAddSecretCmd(t *testing.T) {
 				})
 			}
 
-			manifestBefore, err := model.ReadManifest(workerDir)
+			manifestBefore, err := common.ReadManifest(workerDir)
 			require.NoError(t, err)
 
 			cmd := []string{"worker", "add-secret"}
@@ -135,7 +142,7 @@ func TestAddSecretCmd(t *testing.T) {
 
 			if tt.wantErr == "" {
 				require.NoError(t, err)
-				manifestAfter, err := model.ReadManifest(workerDir)
+				manifestAfter, err := common.ReadManifest(workerDir)
 				assert.NoError(t, err)
 				tt.assert(t, manifestBefore, manifestAfter)
 			} else {
@@ -148,7 +155,7 @@ func TestAddSecretCmd(t *testing.T) {
 func assertSecrets(wantSecrets model.Secrets) addSecretAssertFunc {
 	return func(t *testing.T, manifestBefore, manifestAfter *model.Manifest) {
 		require.Equalf(t, len(wantSecrets), len(manifestAfter.Secrets), "Invalid secrets length")
-		require.NoError(t, manifestAfter.DecryptSecrets())
+		require.NoError(t, common.DecryptManifestSecrets(manifestAfter))
 		assert.Equalf(t, wantSecrets, manifestAfter.Secrets, "Secrets mismatch")
 	}
 }

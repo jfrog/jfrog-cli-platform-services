@@ -1,17 +1,16 @@
 package commands
 
 import (
-	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"slices"
 	"strings"
 
+	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
+
 	plugins_common "github.com/jfrog/jfrog-cli-core/v2/plugins/common"
 	"github.com/jfrog/jfrog-cli-core/v2/plugins/components"
-	"github.com/jfrog/jfrog-client-go/utils/log"
-
 	"github.com/jfrog/jfrog-cli-platform-services/model"
 )
 
@@ -33,7 +32,7 @@ func GetListCommand() components.Command {
 		Arguments: []components.Argument{
 			{
 				Name:        "action",
-				Description: fmt.Sprintf("Only show workers of this type.\n\t\tShould be one of (%s).", strings.Join(strings.Split(model.ActionNames(), "|"), ", ")),
+				Description: "Only show workers of this type.\n\t\tUse `jf worker list-event` to see all available actions.",
 				Optional:    true,
 			},
 		},
@@ -48,74 +47,59 @@ func GetListCommand() components.Command {
 }
 
 func runListCommand(ctx *components.Context, serverUrl string, token string) error {
-	api := "workers"
 	params := make(map[string]string)
 
+	var action string
+
 	if len(ctx.Arguments) > 0 {
-		params["action"] = ctx.Arguments[0]
+		action = strings.TrimSpace(ctx.Arguments[0])
+	}
+	if action != "" {
+		params["action"] = action
 	}
 
-	projectKey := ctx.GetStringFlagValue(model.FlagProjectKey)
-	if projectKey != "" {
-		params["projectKey"] = projectKey
-	}
-
-	res, discardReq, err := callWorkerApi(ctx, serverUrl, token, http.MethodGet, nil, params, api)
-	if discardReq != nil {
-		defer discardReq()
-	}
-	if err != nil {
-		return err
-	}
-
+	contentHandler := printWorkerDetailsAsCsv
 	if ctx.GetBoolFlagValue(model.FlagJsonOutput) {
-		return outputApiResponse(res, http.StatusOK)
+		contentHandler = common.PrintJson
 	}
 
-	return formatListResponseAsCsv(res, http.StatusOK)
+	return common.CallWorkerApi(ctx, common.ApiCallParams{
+		Method:      http.MethodGet,
+		ServerUrl:   serverUrl,
+		ServerToken: token,
+		Query:       params,
+		OkStatuses:  []int{http.StatusOK},
+		Path:        []string{"workers"},
+		ProjectKey:  ctx.GetStringFlagValue(model.FlagProjectKey),
+		OnContent:   contentHandler,
+	})
 }
 
-func formatListResponseAsCsv(res *http.Response, okStatus int) error {
-	return processApiResponse(res, func(responseBytes []byte, statusCode int) error {
-		var err error
+func printWorkerDetailsAsCsv(responseBytes []byte) error {
+	var err error
+	allWorkers := getAllResponse{}
 
-		if res.StatusCode != okStatus {
-			err = fmt.Errorf("command failed with status %d", res.StatusCode)
-		}
+	err = json.Unmarshal(responseBytes, &allWorkers)
+	if err != nil {
+		return nil
+	}
 
-		if err == nil {
-			allWorkers := getAllResponse{}
+	writer := common.NewCsvWriter()
 
-			err = json.Unmarshal(responseBytes, &allWorkers)
-			if err != nil {
-				return nil
-			}
-
-			writer := csv.NewWriter(cliOut)
-
-			slices.SortFunc(allWorkers.Workers, func(a, b *model.WorkerDetails) int {
-				return strings.Compare(a.Key, b.Key)
-			})
-
-			for _, wk := range allWorkers.Workers {
-				err = writer.Write([]string{
-					wk.Key, wk.Action, wk.Description, fmt.Sprint(wk.Enabled),
-				})
-				if err != nil {
-					return err
-				}
-			}
-
-			writer.Flush()
-
-			return writer.Error()
-		} else if len(responseBytes) > 0 {
-			// We will report the previous error, but we still want to display the response body
-			if _, writeErr := cliOut.Write(prettifyJson(responseBytes)); writeErr != nil {
-				log.Debug(fmt.Sprintf("Write error: %+v", writeErr))
-			}
-		}
-
-		return err
+	slices.SortFunc(allWorkers.Workers, func(a, b *model.WorkerDetails) int {
+		return strings.Compare(a.Key, b.Key)
 	})
+
+	for _, wk := range allWorkers.Workers {
+		err = writer.Write([]string{
+			wk.Key, wk.Action, wk.Description, fmt.Sprint(wk.Enabled),
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	writer.Flush()
+
+	return writer.Error()
 }

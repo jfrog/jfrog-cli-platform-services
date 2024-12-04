@@ -1,0 +1,15 @@
+{
+  "action": {
+    "application": "worker",
+    "name": "SCHEDULED_EVENT"
+  },
+  "description": "Scheduled events are triggered on schedule provided by the user.",
+  "samplePayload": "{\"triggerID\":\"triggerID\"}",
+  "sampleCode": "\nexport default async (context: PlatformContext, data: ScheduledEventRequest): Promise<ScheduledEventResponse> => {\n    try {\n        // The in-browser HTTP client facilitates making calls to the JFrog REST APIs\n        //To call an external endpoint, use 'await context.clients.axios.get(\"https://foo.com\")'\n        const res = await context.clients.platformHttp.get('/artifactory/api/v1/system/readiness');\n\n        // You should reach this part if the HTTP request status is successful (HTTP Status 399 or lower)\n        if (res.status === 200) {\n            console.log(\"Artifactory ping success\");\n        } else {\n            console.warn(`Request is successful but returned status other than 200. Status code : ${res.status}`);\n        }\n    } catch(error) {\n        // The platformHttp client throws PlatformHttpClientError if the HTTP request status is 400 or higher\n        console.error(`Request failed with status code ${error.status || '<none>'} caused by : ${error.message}`)\n    }\n\n    return {\n        message: 'Overwritten by worker-service if an error occurs.',\n    }\n}\n",
+  "typesDefinitions": "\ninterface ScheduledEventRequest {\n    /** The trigger ID of the event */\n    triggerID: string;\n}\n\ninterface ScheduledEventResponse {\n    /** Message to print to the log, in case of an error it will be printed as a warning */\n    message: string;\n}\n",
+  "supportProjects": true,
+  "filterType": "SCHEDULE",
+  "mandatoryFilter": true,
+  "wikiUrl": "TBD",
+  "async": true
+}

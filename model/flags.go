@@ -21,6 +21,7 @@ const (
 	FlagJsonOutput       = "json"
 	FlagTimeout          = "timeout-ms"
 	FlagProjectKey       = "project-key"
+	FlagApplication      = "application"
 	defaultTimeoutMillis = 5000
 )
 
@@ -31,7 +32,7 @@ var (
 	EnvKeyAddSecretValue  = "JFROG_WORKER_CLI_DEV_ADD_SECRET_VALUE"
 )
 
-type intFlagProvider interface {
+type IntFlagProvider interface {
 	IsFlagSet(name string) bool
 	GetIntFlagValue(name string) (int, error)
 }
@@ -83,7 +84,7 @@ func GetJsonPayloadArgument() components.Argument {
 	}
 }
 
-func GetTimeoutParameter(c intFlagProvider) (time.Duration, error) {
+func GetTimeoutParameter(c IntFlagProvider) (time.Duration, error) {
 	if !c.IsFlagSet(FlagTimeout) {
 		return defaultTimeoutMillis * time.Millisecond, nil
 	}
@@ -93,6 +94,14 @@ func GetTimeoutParameter(c intFlagProvider) (time.Duration, error) {
 		return 0, errors.New("invalid timeout provided")
 	}
 	return time.Duration(value) * time.Millisecond, nil
+}
+
+func GetApplicationFlag() components.StringFlag {
+	return components.NewStringFlag(
+		FlagApplication,
+		"The application that provides the event. If omitted worker will try to guess it and will raise an error if it cannot.",
+		components.WithStrDefaultValue(""),
+	)
 }
 
 func GetServerDetails(c *components.Context) (*config.ServerDetails, error) {

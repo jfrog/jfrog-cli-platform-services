@@ -4,28 +4,16 @@ package infra
 
 import (
 	"context"
-	"os"
 	"time"
+
+	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 
 	"github.com/jfrog/jfrog-cli-platform-services/model"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-const secretPassword = "P@ssw0rd!"
-
-func MustEncryptSecret(t require.TestingT, secretValue string) string {
-	encryptedValue, err := model.EncryptSecret(secretPassword, secretValue)
-	require.NoError(t, err)
-	return encryptedValue
-}
-
-func AddSecretPasswordToEnv(t cliTestingT) {
-	err := os.Setenv(model.EnvKeySecretsPassword, secretPassword)
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		_ = os.Unsetenv(model.EnvKeySecretsPassword)
-	})
+func AddSecretPasswordToEnv(t common.Test) {
+	common.TestSetEnv(t, model.EnvKeySecretsPassword, common.SecretPassword)
 }
 
 func AssertSecretValueFromServer(it *Test, workerKey string, secretKey string, wantValue string) {

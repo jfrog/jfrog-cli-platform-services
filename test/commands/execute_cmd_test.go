@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -35,7 +37,7 @@ func TestExecute(t *testing.T) {
 		executeSpec(executeTestCase{
 			name: "execute from manifest",
 			commandArgs: []string{
-				infra.MustJsonMarshal(t, map[string]any{"my": "payload"}),
+				common.MustJsonMarshal(t, map[string]any{"my": "payload"}),
 			},
 			assert: assertExecuteSucceed,
 		}),
@@ -44,19 +46,19 @@ func TestExecute(t *testing.T) {
 			workerKey: "my-worker",
 			commandArgs: []string{
 				"my-worker",
-				infra.MustJsonMarshal(t, map[string]any{"my": "payload"}),
+				common.MustJsonMarshal(t, map[string]any{"my": "payload"}),
 			},
 			assert: assertExecuteSucceed,
 		}),
 		executeSpec(executeTestCase{
 			name:        "reads from stdin",
-			stdInput:    infra.MustJsonMarshal(t, map[string]any{"my": "request"}),
+			stdInput:    common.MustJsonMarshal(t, map[string]any{"my": "request"}),
 			commandArgs: []string{"-"},
 			assert:      assertExecuteSucceed,
 		}),
 		executeSpec(executeTestCase{
 			name:      "reads from file",
-			fileInput: infra.MustJsonMarshal(t, map[string]any{"my": "file-content"}),
+			fileInput: common.MustJsonMarshal(t, map[string]any{"my": "file-content"}),
 			assert:    assertExecuteSucceed,
 		}),
 		executeSpec(executeTestCase{
@@ -132,7 +134,7 @@ func executeSpec(tc executeTestCase) infra.TestDefinition {
 			}
 
 			// We should enable the worker
-			infra.PatchManifest(it, func(mf *model.Manifest) {
+			common.PatchManifest(it, func(mf *model.Manifest) {
 				mf.Name = workerName
 				mf.Enabled = true
 			})
@@ -149,7 +151,7 @@ func executeSpec(tc executeTestCase) infra.TestDefinition {
 			cmd = append(cmd, tc.commandArgs...)
 
 			if tc.fileInput != "" {
-				cmd = append(cmd, "@"+infra.CreateTempFileWithContent(it, tc.fileInput))
+				cmd = append(cmd, "@"+common.CreateTempFileWithContent(it, tc.fileInput))
 			}
 
 			tc.assert(it, it.RunCommand(cmd...), &tc)

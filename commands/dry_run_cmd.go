@@ -2,7 +2,10 @@ package commands
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+
+	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 
 	"github.com/jfrog/jfrog-client-go/utils/log"
 
@@ -39,12 +42,8 @@ func GetDryRunCommand() components.Command {
 		Action: func(c *components.Context) error {
 			h := &dryRunHandler{c}
 
-			manifest, err := model.ReadManifest()
+			manifest, err := common.ReadManifest()
 			if err != nil {
-				return err
-			}
-
-			if err = manifest.Validate(); err != nil {
 				return err
 			}
 
@@ -53,15 +52,24 @@ func GetDryRunCommand() components.Command {
 				return err
 			}
 
-			inputReader := &cmdInputReader{c}
+			actionsMeta, err := common.FetchActions(c, server.GetUrl(), server.GetAccessToken(), manifest.ProjectKey)
+			if err != nil {
+				return err
+			}
 
-			data, err := inputReader.readData()
+			if err = common.ValidateManifest(manifest, actionsMeta); err != nil {
+				return err
+			}
+
+			inputReader := common.NewInputReader(c)
+
+			data, err := inputReader.ReadData()
 			if err != nil {
 				return err
 			}
 
 			if !c.GetBoolFlagValue(model.FlagNoSecrets) {
-				if err = manifest.DecryptSecrets(); err != nil {
+				if err = common.DecryptManifestSecrets(manifest); err != nil {
 					return err
 				}
 			}
@@ -76,8 +84,19 @@ func (c *dryRunHandler) run(manifest *model.Manifest, serverUrl string, token st
 	if err != nil {
 		return err
 	}
-	queryParams := c.prepareQueryParams(manifest)
-	return callWorkerApiWithOutput(c.ctx, serverUrl, token, http.MethodPost, body, http.StatusOK, queryParams, "test", manifest.Name)
+	return common.CallWorkerApi(c.ctx, common.ApiCallParams{
+		Method:      http.MethodPost,
+		ServerUrl:   serverUrl,
+		ServerToken: token,
+		Body:        body,
+		ProjectKey:  manifest.ProjectKey,
+		Query: map[string]string{
+			"debug": fmt.Sprint(manifest.Debug),
+		},
+		OkStatuses: []int{http.StatusOK},
+		Path:       []string{"test", manifest.Name},
+		OnContent:  common.PrintJson,
+	})
 }
 
 func (c *dryRunHandler) preparePayload(manifest *model.Manifest, serverUrl string, token string, data map[string]any) ([]byte, error) {
@@ -85,34 +104,20 @@ func (c *dryRunHandler) preparePayload(manifest *model.Manifest, serverUrl strin
 
 	var err error
 
-	payload.Code, err = manifest.ReadSourceCode()
+	payload.Code, err = common.ReadSourceCode(manifest)
 	if err != nil {
 		return nil, err
 	}
-	payload.Code = model.CleanImports(payload.Code)
+	payload.Code = common.CleanImports(payload.Code)
 
-	existingWorker, err := fetchWorkerDetails(c.ctx, serverUrl, token, manifest.Name, manifest.ProjectKey)
+	existingWorker, err := common.FetchWorkerDetails(c.ctx, serverUrl, token, manifest.Name, manifest.ProjectKey)
 	if err != nil {
 		log.Warn(err.Error())
 	}
 
 	if !c.ctx.GetBoolFlagValue(model.FlagNoSecrets) {
-		payload.StagedSecrets = prepareSecretsUpdate(manifest, existingWorker)
+		payload.StagedSecrets = common.PrepareSecretsUpdate(manifest, existingWorker)
 	}
 
 	return json.Marshal(&payload)
-}
-
-func (c *dryRunHandler) prepareQueryParams(manifest *model.Manifest) map[string]string {
-	queryParams := make(map[string]string)
-
-	if manifest.ProjectKey != "" {
-		queryParams["projectKey"] = manifest.ProjectKey
-	}
-
-	if manifest.Debug {
-		queryParams["debug"] = "true"
-	}
-
-	return queryParams
 }

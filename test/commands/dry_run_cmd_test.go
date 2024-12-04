@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -36,19 +38,19 @@ func TestDryRun(t *testing.T) {
 		dryRunSpec(dryRunTestCase{
 			name: "nominal case",
 			commandArgs: []string{
-				infra.MustJsonMarshal(t, map[string]any{"my": "payload"}),
+				common.MustJsonMarshal(t, map[string]any{"my": "payload"}),
 			},
 			assert: assertDryRunSucceed,
 		}),
 		dryRunSpec(dryRunTestCase{
 			name:        "reads from stdin",
-			stdInput:    infra.MustJsonMarshal(t, map[string]any{"my": "request"}),
+			stdInput:    common.MustJsonMarshal(t, map[string]any{"my": "request"}),
 			commandArgs: []string{"-"},
 			assert:      assertDryRunSucceed,
 		}),
 		dryRunSpec(dryRunTestCase{
 			name:      "reads from file",
-			fileInput: infra.MustJsonMarshal(t, map[string]any{"my": "file-content"}),
+			fileInput: common.MustJsonMarshal(t, map[string]any{"my": "file-content"}),
 			assert:    assertDryRunSucceed,
 		}),
 		dryRunSpec(dryRunTestCase{
@@ -93,7 +95,7 @@ func TestDryRun(t *testing.T) {
 					Description: "My worker",
 					Enabled:     true,
 					SourceCode:  `export default async function() { return { "status": "OK" } }`,
-					Action:      model.ActionGenericEvent,
+					Action:      "GENERIC_EVENT",
 					Secrets: []*model.Secret{
 						{
 							Key: "sec-1", Value: "val-1",
@@ -105,7 +107,7 @@ func TestDryRun(t *testing.T) {
 			patchManifest: func(mf *model.Manifest) {
 				mf.ProjectKey = "my-project"
 				mf.Name = "wk-1"
-				mf.Secrets = model.Secrets{"sec-1": infra.MustEncryptSecret(t, "val-1-updated")}
+				mf.Secrets = model.Secrets{"sec-1": common.MustEncryptSecret(t, "val-1-updated")}
 			},
 			assert: assertDryRunWithSecretsUpdate,
 		}),
@@ -123,7 +125,7 @@ func dryRunSpec(tc dryRunTestCase) infra.TestDefinition {
 			for _, initialWorker := range tc.initWorkers {
 				it.CreateWorker(initialWorker)
 				it.Cleanup(func() {
-					it.DeleteWorker(initialWorker.KeyWithProject())
+					it.DeleteWorker(initialWorker.Key)
 				})
 			}
 
@@ -144,14 +146,14 @@ func dryRunSpec(tc dryRunTestCase) infra.TestDefinition {
 			infra.AddSecretPasswordToEnv(it)
 
 			if tc.patchManifest != nil {
-				infra.PatchManifest(it, tc.patchManifest)
+				common.PatchManifest(it, tc.patchManifest)
 			}
 
 			cmd := []string{infra.AppName, "dry-run"}
 			cmd = append(cmd, tc.commandArgs...)
 
 			if tc.fileInput != "" {
-				cmd = append(cmd, "@"+infra.CreateTempFileWithContent(it, tc.fileInput))
+				cmd = append(cmd, "@"+common.CreateTempFileWithContent(it, tc.fileInput))
 			}
 
 			tc.assert(it, it.RunCommand(cmd...), &tc)
