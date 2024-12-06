@@ -45,7 +45,8 @@ GOLANGCI_LINT:
 
 ########## BUILD ##########
 prereq::
-	${GOCMD} install github.com/jstemmer/go-junit-report@v1.0.0
+	$(GOCMD) install github.com/jstemmer/go-junit-report@v1.0.0
+	GOBIN=${TOOLS_DIR} $(GOCMD) install go.uber.org/mock/mockgen@v0.5.0
 
 build::
 	go env GOOS GOARCH
@@ -67,7 +68,7 @@ clean-mock:
 .PHONY: generate-mock
 generate-mock: clean-mock
 	@echo Generating test mocks
-	go generate ./...
+	TOOLS_DIR=$(TOOLS_DIR) go generate ./...
 
 test-prereq: prereq generate-mock
 	mkdir -p target/reports
