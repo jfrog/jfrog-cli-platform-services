@@ -1,6 +1,6 @@
 package common
 
-//go:generate mockgen -source=${GOFILE} -destination=mocks/${GOFILE}
+//go:generate ${TOOLS_DIR}/mockgen -source=${GOFILE} -destination=mocks/${GOFILE}
 
 import (
 	"bytes"
