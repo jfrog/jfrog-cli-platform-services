@@ -3,7 +3,7 @@
 package commands
 
 import (
-	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -26,9 +26,8 @@ func TestListEventCommand(t *testing.T) {
 		listEventTestSpec(listEventTestCase{
 			name: "list-event",
 			assertOutput: func(t require.TestingT, content []byte) {
-				var events []string
-				require.NoError(t, json.Unmarshal(content, &events))
-				assert.Truef(t, len(events) > 0, "no events received")
+				events := strings.Split(string(content), ", ")
+				assert.Truef(t, len(events) > 2, "no events received")
 			},
 		}),
 	}, t)
