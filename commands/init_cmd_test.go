@@ -62,7 +62,7 @@ func TestInitWorker(t *testing.T) {
 			name: "invalid action",
 			test: func(t *testing.T, runCommand runCommandFunc) {
 				err := runCommand("worker", "init", "--timeout-ms", "60000", "HACK_SYSTEM", "root")
-				assert.Regexp(t, regexp.MustCompile(`^\s*invalid\s+action\s+'HACK_SYSTEM'\s+action\s+should\s+be\s+one\s+of:\s+\[[^]]+]\s*$`), err)
+				assert.Regexp(t, regexp.MustCompile(`^\s*action\s+'HACK_SYSTEM'\s+not\s+found+\s*.\s+It\s+should\s+be\s+one\s+of\s+\[[^]]+]\s*$`), err)
 			},
 		},
 		{

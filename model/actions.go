@@ -4,7 +4,7 @@ type ActionFilterType string
 
 const (
 	FilterTypeRepo     = "FILTER_REPO"
-	FilterTypeSchedule = "FILTER_SCHEDULE"
+	FilterTypeSchedule = "SCHEDULE"
 )
 
 type Action struct {

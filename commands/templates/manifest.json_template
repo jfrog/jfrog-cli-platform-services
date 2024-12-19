@@ -8,6 +8,14 @@
         }
     },
 {{- end }}
+{{- if .HasSchedule }}
+    "filterCriteria": {
+        "schedule": {
+            "cron": "0 * * * *",
+            "timezone": "UTC"
+        }
+    },
+{{- end }}
     "secrets": {},
     "sourceCodePath": "./worker.ts",
     "action": "{{.Action}}",

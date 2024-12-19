@@ -56,6 +56,17 @@ func GetDeployCommand() components.Command {
 				return err
 			}
 
+			actionMeta, err := actionsMeta.FindAction(manifest.Action, manifest.Application)
+			if err != nil {
+				return err
+			}
+
+			if actionMeta.MandatoryFilter && actionMeta.FilterType == model.FilterTypeSchedule {
+				if err = common.ValidateScheduleCriteria(&manifest.FilterCriteria.Schedule); err != nil {
+					return fmt.Errorf("manifest validation failed: %w", err)
+				}
+			}
+
 			if !c.GetBoolFlagValue(model.FlagNoSecrets) {
 				if err = common.DecryptManifestSecrets(manifest); err != nil {
 					return err

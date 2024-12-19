@@ -29,5 +29,6 @@ func getCommands() []components.Command {
 		commands.GetListCommand(),
 		commands.GetAddSecretCommand(),
 		commands.GetListEventsCommand(),
+		commands.GetEditScheduleCommand(),
 	}
 }

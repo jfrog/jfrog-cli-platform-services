@@ -5,8 +5,10 @@ package common
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 
 	"github.com/jfrog/jfrog-cli-platform-services/model"
@@ -212,7 +214,7 @@ func TestManifest_Validate(t *testing.T) {
 				mf.Action = "HACK_ME"
 			}),
 			assert: func(t *testing.T, err error) {
-				assert.EqualError(t, err, invalidManifestErr("action 'HACK_ME' not found").Error())
+				assert.Regexp(t, regexp.MustCompile("action 'HACK_ME' not found"), err)
 			},
 		},
 		{
@@ -287,6 +289,56 @@ func TestManifest_DecryptSecrets(t *testing.T) {
 			})
 
 			tt.assert(t, mf, DecryptManifestSecrets(mf))
+		})
+	}
+}
+
+func TestManifest_ValidateScheduleCriteria(t *testing.T) {
+	tests := []struct {
+		name     string
+		criteria *model.ScheduleFilterCriteria
+		wantErr  error
+	}{
+		{
+			name: "valid",
+			criteria: &model.ScheduleFilterCriteria{
+				Cron:     "0 1 1 * *",
+				Timezone: "UTC",
+			},
+		},
+		{
+			name: "missing cron",
+			criteria: &model.ScheduleFilterCriteria{
+				Timezone: "UTC",
+			},
+			wantErr: errors.New("missing cron expression"),
+		},
+		{
+			name: "invalid cron",
+			criteria: &model.ScheduleFilterCriteria{
+				Cron:     "0 0 0 * * * *",
+				Timezone: "UTC",
+			},
+			wantErr: errors.New("invalid cron expression"),
+		},
+		{
+			name: "invalid timezone",
+			criteria: &model.ScheduleFilterCriteria{
+				Cron:     "0 1 1 * *",
+				Timezone: "America/Toulouse",
+			},
+			wantErr: errors.New("invalid timezone 'America/Toulouse'"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateScheduleCriteria(tt.criteria)
+			if tt.wantErr == nil {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.wantErr.Error())
+			}
 		})
 	}
 }

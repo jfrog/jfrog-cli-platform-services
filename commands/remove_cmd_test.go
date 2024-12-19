@@ -52,9 +52,10 @@ func TestRemoveCommand(t *testing.T) {
 			assert: common.AssertOutputError("request timed out after 500ms"),
 		},
 		{
-			name:        "fails if invalid timeout",
-			commandArgs: []string{"--" + model.FlagTimeout, "abc"},
-			assert:      common.AssertOutputError("invalid timeout provided"),
+			name:           "fails if invalid timeout",
+			commandArgs:    []string{"--" + model.FlagTimeout, "abc"},
+			serverBehavior: common.NewServerStub(t).WithDefaultActionsMetadataEndpoint(),
+			assert:         common.AssertOutputError("invalid timeout provided"),
 		},
 	}
 

@@ -11,6 +11,7 @@ import (
 
 	"github.com/jfrog/jfrog-cli-platform-services/model"
 	"github.com/jfrog/jfrog-client-go/utils/log"
+	"github.com/robfig/cron/v3"
 )
 
 // ReadManifest reads a manifest from the working directory or from the directory provided as argument.
@@ -139,6 +140,25 @@ func DecryptManifestSecrets(mf *model.Manifest, withPassword ...string) error {
 			return fmt.Errorf("cannot decrypt secret '%s', please check the manifest", name)
 		}
 		mf.Secrets[name] = clearValue
+	}
+
+	return nil
+}
+
+var cronParser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+
+func ValidateScheduleCriteria(c *model.ScheduleFilterCriteria) error {
+	if c.Cron == "" {
+		return errors.New("missing cron expression")
+	}
+
+	if _, err := cronParser.Parse(c.Cron); err != nil {
+		log.Debug(fmt.Sprintf("invalid cron expression: %+v", err))
+		return errors.New("invalid cron expression")
+	}
+
+	if c.Timezone != "" && !model.IsValidTimezone(c.Timezone) {
+		return errors.New("invalid timezone '" + c.Timezone + "'")
 	}
 
 	return nil

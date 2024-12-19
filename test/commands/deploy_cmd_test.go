@@ -23,6 +23,7 @@ type deployTestCase struct {
 	skip          bool
 	wantErr       error
 	workerKey     string
+	workerAction  string
 	commandArgs   []string
 	initWorkers   []*model.WorkerDetails
 	patchManifest func(mf *model.Manifest)
@@ -33,6 +34,11 @@ func TestDeployCommand(t *testing.T) {
 		deployTestSpec(deployTestCase{
 			name:      "create",
 			workerKey: "wk-0",
+		}),
+		deployTestSpec(deployTestCase{
+			name:         "deploy scheduled event",
+			workerKey:    "wk-1_1",
+			workerAction: "SCHEDULED_EVENT",
 		}),
 		deployTestSpec(deployTestCase{
 			name:      "update",
@@ -94,7 +100,12 @@ func deployTestSpec(tc deployTestCase) infra.TestDefinition {
 				workerName = tc.workerKey
 			}
 
-			err := it.RunCommand(infra.AppName, "init", "GENERIC_EVENT", workerName)
+			workerAction := tc.workerAction
+			if workerAction == "" {
+				workerAction = "GENERIC_EVENT"
+			}
+
+			err := it.RunCommand(infra.AppName, "init", "SCHEDULED_EVENT", workerName)
 			require.NoError(it, err)
 
 			if tc.patchManifest != nil {
