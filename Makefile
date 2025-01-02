@@ -48,32 +48,23 @@ prereq::
 	$(GOCMD) install github.com/jstemmer/go-junit-report@v1.0.0
 	GOBIN=${TOOLS_DIR} $(GOCMD) install go.uber.org/mock/mockgen@v0.5.0
 
-build::
-	go env GOOS GOARCH
-	go build -ldflags="${LINKERFLAGS}" -gcflags ${COMPILERFLAGS} -o ${BINARY_CLI}/worker-cli-plugin main.go
-
-
-build-install:: build
-	mkdir -p "${HOME}/.jfrog/plugins/worker/bin"
-	mv ${BINARY_CLI}/worker-cli-plugin "${HOME}/.jfrog/plugins/worker/bin/worker"
-	chmod +x "${HOME}/.jfrog/plugins/worker/bin/worker"
-
 ########## TEST ##########
 
-.PHONY: clean-mock
 clean-mock:
 	@echo Cleaning generated mock files
 	find . -path "*/mocks/*.go" -delete
 
-.PHONY: generate-mock
-generate-mock: clean-mock
-	@echo Generating test mocks
-	TOOLS_DIR=$(TOOLS_DIR) go generate ./...
+generate: prereq clean-mock
+	TOOLS_DIR=$(TOOLS_DIR) SCRIPTS_DIR=$(SCRIPTS_DIR) go generate ./...
 
-test-prereq: prereq generate-mock
+# Used in pipeline so we keep this alias
+generate-mock: generate
+
+test-prereq: generate-mock
 	mkdir -p target/reports
 
 test: PACKAGES=./...
+test: TAGS=-tags=test
 test: TEST_ARGS=-short
 test: test-prereq do-run-tests
 

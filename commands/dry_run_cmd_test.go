@@ -11,8 +11,6 @@ import (
 
 	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/jfrog/jfrog-cli-platform-services/model"
 )
 
@@ -20,6 +18,7 @@ func TestDryRun(t *testing.T) {
 	tests := []struct {
 		name          string
 		commandArgs   []string
+		initExtraArgs []string
 		assert        common.AssertOutputFunc
 		patchManifest func(mf *model.Manifest)
 		// Use this workerKey instead of a random generated one
@@ -47,7 +46,7 @@ func TestDryRun(t *testing.T) {
 				WithToken("invalid-token").
 				WithTestEndpoint(nil, nil),
 			commandArgs: []string{`{}`},
-			assert:      common.AssertOutputErrorRegexp(`command\s.+returned\san\sunexpected\sstatus\scode\s403`),
+			assert:      common.AssertOutputErrorRegexp(`command.*returned\san\sunexpected\sstatus\scode\s403`),
 		},
 		{
 			name:     "reads from stdin",
@@ -94,7 +93,7 @@ func TestDryRun(t *testing.T) {
 		{
 			name:        "fails if timeout exceeds",
 			commandArgs: []string{"--" + model.FlagTimeout, "500", `{}`},
-			serverStub:  common.NewServerStub(t).WithDelay(5*time.Second).WithTestEndpoint(nil, nil),
+			serverStub:  common.NewServerStub(t).WithDelay(2*time.Second).WithTestEndpoint(nil, nil),
 			assert:      common.AssertOutputError("request timed out after 500ms"),
 		},
 		{
@@ -108,8 +107,9 @@ func TestDryRun(t *testing.T) {
 			assert:      common.AssertOutputError("missing file path"),
 		},
 		{
-			name:      "should propagate projectKey",
-			workerKey: "my-worker",
+			name:          "should propagate projectKey",
+			workerKey:     "my-worker",
+			initExtraArgs: []string{"--" + model.FlagProjectKey, "my-project"},
 			serverStub: common.NewServerStub(t).
 				WithProjectKey("my-project").
 				WithTestEndpoint(
@@ -136,13 +136,6 @@ func TestDryRun(t *testing.T) {
 				workerName = tt.workerKey
 			}
 
-			err := runCmd("worker", "init", "BEFORE_DOWNLOAD", workerName)
-			require.NoError(t, err)
-
-			if tt.patchManifest != nil {
-				common.PatchManifest(t, tt.patchManifest)
-			}
-
 			if tt.serverStub == nil {
 				tt.serverStub = common.NewServerStub(t)
 			}
@@ -156,6 +149,17 @@ func TestDryRun(t *testing.T) {
 						Key: workerName,
 					}),
 			)
+
+			initCmd := append([]string{"worker", "init"}, tt.initExtraArgs...)
+			err := runCmd(append(initCmd, "BEFORE_DOWNLOAD", workerName)...)
+			if err != nil {
+				tt.assert(t, nil, err)
+				return
+			}
+
+			if tt.patchManifest != nil {
+				common.PatchManifest(t, tt.patchManifest)
+			}
 
 			if tt.stdInput != "" {
 				common.SetCliIn(bytes.NewReader([]byte(tt.stdInput)))

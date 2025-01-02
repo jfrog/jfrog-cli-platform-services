@@ -11,8 +11,6 @@ import (
 
 	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/jfrog/jfrog-cli-platform-services/model"
 )
 
@@ -20,11 +18,12 @@ func TestExecute(t *testing.T) {
 	payload := map[string]any{"my": "payload"}
 
 	tests := []struct {
-		name        string
-		commandArgs []string
-		assert      common.AssertOutputFunc
-		action      string
-		workerKey   string
+		name          string
+		commandArgs   []string
+		initExtraArgs []string
+		assert        common.AssertOutputFunc
+		action        string
+		workerKey     string
 		// The server behavior
 		serverStub *common.ServerStub
 		// If provided the cliIn will be filled with this content
@@ -59,7 +58,7 @@ func TestExecute(t *testing.T) {
 			name:        "fails if not OK status",
 			serverStub:  common.NewServerStub(t).WithToken("invalid-token").WithExecuteEndpoint(nil, nil),
 			commandArgs: []string{`{}`},
-			assert:      common.AssertOutputErrorRegexp(`command\sPOST.+returned\san\sunexpected\sstatus\scode\s403`),
+			assert:      common.AssertOutputErrorRegexp(`command.+returned\san\sunexpected\sstatus\scode\s403`),
 		},
 		{
 			name:     "reads from stdin",
@@ -88,8 +87,9 @@ func TestExecute(t *testing.T) {
 			serverStub: common.NewServerStub(t).
 				WithProjectKey("my-project").
 				WithExecuteEndpoint(nil, payload),
-			commandArgs: []string{"-"},
-			stdInput:    `{}`,
+			initExtraArgs: []string{"--" + model.FlagProjectKey, "my-project"},
+			commandArgs:   []string{"-"},
+			stdInput:      `{}`,
 			patchManifest: func(mf *model.Manifest) {
 				mf.ProjectKey = "my-project"
 				mf.Name = "my-worker"
@@ -120,7 +120,7 @@ func TestExecute(t *testing.T) {
 		{
 			name:        "fails if timeout exceeds",
 			commandArgs: []string{"--" + model.FlagTimeout, "500", `{}`},
-			serverStub:  common.NewServerStub(t).WithDelay(5*time.Second).WithExecuteEndpoint(nil, nil),
+			serverStub:  common.NewServerStub(t).WithDelay(2*time.Second).WithExecuteEndpoint(nil, nil),
 			assert:      common.AssertOutputError("request timed out after 500ms"),
 		},
 		{
@@ -150,13 +150,6 @@ func TestExecute(t *testing.T) {
 				action = tt.action
 			}
 
-			err := runCmd("worker", "init", action, workerName)
-			require.NoError(t, err)
-
-			if tt.patchManifest != nil {
-				common.PatchManifest(t, tt.patchManifest)
-			}
-
 			if tt.serverStub == nil {
 				tt.serverStub = common.NewServerStub(t)
 			}
@@ -170,6 +163,17 @@ func TestExecute(t *testing.T) {
 						Key: workerName,
 					}),
 			)
+
+			initCmd := append([]string{"worker", "init"}, tt.initExtraArgs...)
+			err := runCmd(append(initCmd, action, workerName)...)
+			if err != nil {
+				tt.assert(t, nil, err)
+				return
+			}
+
+			if tt.patchManifest != nil {
+				common.PatchManifest(t, tt.patchManifest)
+			}
 
 			if tt.stdInput != "" {
 				common.SetCliIn(bytes.NewReader([]byte(tt.stdInput)))

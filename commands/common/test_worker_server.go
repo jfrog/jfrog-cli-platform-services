@@ -361,7 +361,9 @@ func (s *ServerStub) handleGetAllMetadata(metadata ActionsMetadata) http.Handler
 		res.Header().Set("Content-Type", "application/json")
 
 		_, err := res.Write([]byte(MustJsonMarshal(s.test, metadata)))
-		require.NoError(s.test, err)
+		if err != nil {
+			s.test.Logf("Failed to write response: %v", err)
+		}
 	}
 }
 

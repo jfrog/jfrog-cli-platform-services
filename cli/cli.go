@@ -29,6 +29,7 @@ func getWorkerNamespace() components.Namespace {
 			commands.GetListCommand(),
 			commands.GetAddSecretCommand(),
 			commands.GetListEventsCommand(),
+			commands.GetEditScheduleCommand(),
 		},
 	}
 }

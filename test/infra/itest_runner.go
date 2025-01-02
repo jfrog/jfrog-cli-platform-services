@@ -9,8 +9,6 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 
@@ -19,7 +17,7 @@ import (
 	"github.com/jfrog/jfrog-cli-platform-services/model"
 
 	"github.com/google/uuid"
-	coreCommans "github.com/jfrog/jfrog-cli-core/v2/common/commands"
+	corecommands "github.com/jfrog/jfrog-cli-core/v2/common/commands"
 	"github.com/jfrog/jfrog-cli-core/v2/plugins"
 	"github.com/jfrog/jfrog-cli-core/v2/utils/config"
 	"github.com/jfrog/jfrog-cli-core/v2/utils/coreutils"
@@ -80,8 +78,7 @@ func RunITests(tests []TestDefinition, t *testing.T) {
 }
 
 func runTest(t *testing.T, testSpec TestDefinition) {
-	homeDir := createTestHomeDir(t)
-
+	homeDir := t.TempDir()
 	// Setup cli home for tests
 	err := os.Setenv(coreutils.HomeDir, homeDir)
 	require.NoError(t, err)
@@ -101,7 +98,7 @@ func runTest(t *testing.T, testSpec TestDefinition) {
 	require.NotEmpty(t, accessToken, "No platform token provided, please set JF_PLATFORM_ACCESS_TOKEN env var")
 
 	// Generates a server config
-	configCmd := coreCommans.NewConfigCommand(coreCommans.AddOrEdit, serverId)
+	configCmd := corecommands.NewConfigCommand(corecommands.AddOrEdit, serverId)
 	configCmd.SetInteractive(false)
 	configCmd.SetMakeDefault(true)
 	configCmd.SetEncPassword(false)
@@ -159,19 +156,6 @@ func (it *Test) PrepareWorkerTestDir() (string, string) {
 	workerName := path.Base(dir)
 
 	return dir, workerName
-}
-
-func createTestHomeDir(t *testing.T) string {
-	_, filename, _, _ := runtime.Caller(0)
-	dir, err := os.MkdirTemp(filepath.Dir(filename), ".itest-*-no-git")
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		err := os.RemoveAll(dir)
-		if err != nil {
-			t.Logf("Cannot remove test dir: %+v", err)
-		}
-	})
-	return dir
 }
 
 func (it *Test) RunCommand(args ...string) error {

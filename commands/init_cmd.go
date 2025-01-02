@@ -140,6 +140,7 @@ func (c *initHandler) initGenerator(targetDir string, workerName string, project
 		"Application":           md.Action.Application,
 		"WorkerName":            workerName,
 		"HasRepoFilterCriteria": md.MandatoryFilter && md.FilterType == model.FilterTypeRepo,
+		"HasSchedule":           md.MandatoryFilter && md.FilterType == model.FilterTypeSchedule,
 		"HasTests":              !skipTests,
 		"HasRequestType":        md.ExecutionRequestType != "",
 		"ExecutionRequestType":  md.ExecutionRequestType,

@@ -23,6 +23,7 @@ func getApp() components.App {
 		commands.GetListCommand(),
 		commands.GetAddSecretCommand(),
 		commands.GetListEventsCommand(),
+		commands.GetEditScheduleCommand(),
 	}
 	return app
 }

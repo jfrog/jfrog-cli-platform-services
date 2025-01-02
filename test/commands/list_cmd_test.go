@@ -8,11 +8,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 	"slices"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 
 	"github.com/jfrog/jfrog-cli-platform-services/model"
 	"github.com/jfrog/jfrog-cli-platform-services/test/infra"

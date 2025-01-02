@@ -110,6 +110,19 @@ func TestDeployCommand(t *testing.T) {
 			},
 		},
 		{
+			name:           "should validate schedule",
+			workerAction:   "SCHEDULED_EVENT",
+			workerName:     "wk-3",
+			serverBehavior: common.NewServerStub(t).WithGetOneEndpoint(),
+			patchManifest: func(mf *model.Manifest) {
+				mf.FilterCriteria.Schedule = model.ScheduleFilterCriteria{
+					Cron:     "1h",
+					Timezone: "Asia/New_York",
+				}
+			},
+			wantErr: errors.New("manifest validation failed: invalid cron expression"),
+		},
+		{
 			name:        "fails if timeout exceeds",
 			commandArgs: []string{"--" + model.FlagTimeout, "500"},
 			serverBehavior: common.NewServerStub(t).
@@ -155,7 +168,7 @@ func TestDeployCommand(t *testing.T) {
 			if tt.wantErr == nil {
 				assert.NoError(t, err)
 			} else {
-				assert.EqualError(t, tt.wantErr, err.Error())
+				assert.EqualError(t, err, tt.wantErr.Error())
 			}
 		})
 	}
