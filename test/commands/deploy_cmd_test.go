@@ -105,7 +105,7 @@ func deployTestSpec(tc deployTestCase) infra.TestDefinition {
 				workerAction = "GENERIC_EVENT"
 			}
 
-			err := it.RunCommand(infra.AppName, "init", "SCHEDULED_EVENT", workerName)
+			err := it.RunCommand(infra.AppName, "init", workerAction, workerName)
 			require.NoError(it, err)
 
 			if tc.patchManifest != nil {
