@@ -54,7 +54,7 @@ func TestListCommand(t *testing.T) {
 			SourceCode:  `export default async function() { return { "status": "OK" } }`,
 			Action:      "BEFORE_DOWNLOAD",
 			FilterCriteria: model.FilterCriteria{
-				ArtifactFilterCriteria: model.ArtifactFilterCriteria{
+				ArtifactFilterCriteria: &model.ArtifactFilterCriteria{
 					RepoKeys: []string{"example-repo-local"},
 				},
 			},

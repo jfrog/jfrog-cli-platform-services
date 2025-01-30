@@ -115,7 +115,7 @@ func TestDeployCommand(t *testing.T) {
 			workerName:     "wk-3",
 			serverBehavior: common.NewServerStub(t).WithGetOneEndpoint(),
 			patchManifest: func(mf *model.Manifest) {
-				mf.FilterCriteria.Schedule = model.ScheduleFilterCriteria{
+				mf.FilterCriteria.Schedule = &model.ScheduleFilterCriteria{
 					Cron:     "1h",
 					Timezone: "Asia/New_York",
 				}
@@ -231,8 +231,8 @@ func getExpectedDeployRequestForAction(
 	require.NoError(t, err)
 
 	if actionMeta.MandatoryFilter && actionMeta.FilterType == model.FilterTypeRepo {
-		r.FilterCriteria = model.FilterCriteria{
-			ArtifactFilterCriteria: model.ArtifactFilterCriteria{
+		r.FilterCriteria = &model.FilterCriteria{
+			ArtifactFilterCriteria: &model.ArtifactFilterCriteria{
 				RepoKeys: []string{"example-repo-local"},
 			},
 		}

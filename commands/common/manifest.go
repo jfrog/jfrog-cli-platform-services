@@ -145,6 +145,36 @@ func DecryptManifestSecrets(mf *model.Manifest, withPassword ...string) error {
 	return nil
 }
 
+func ValidateFilterCriteria(c *model.FilterCriteria, actionMeta *model.ActionMetadata) error {
+	if !actionMeta.MandatoryFilter {
+		return nil
+	}
+
+	if actionMeta.FilterType == model.FilterTypeSchedule {
+		if c.ArtifactFilterCriteria != nil {
+			return invalidManifestErr("scheduled event cannot have artifact filter criteria")
+		}
+		if err := ValidateScheduleCriteria(c.Schedule); err != nil {
+			return fmt.Errorf("manifest validation failed: %w", err)
+		}
+	}
+
+	if actionMeta.FilterType == model.FilterTypeRepo {
+		if c.Schedule != nil {
+			return invalidManifestErr("repository events cannot have schedule criteria")
+		}
+		if c.ArtifactFilterCriteria == nil {
+			return invalidManifestErr("missing artifact filter criteria")
+		}
+		hasAnyRepo := c.ArtifactFilterCriteria.AnyFederated || c.ArtifactFilterCriteria.AnyLocal || c.ArtifactFilterCriteria.AnyRemote
+		if len(c.ArtifactFilterCriteria.RepoKeys) == 0 && !hasAnyRepo {
+			return invalidManifestErr("at least one repository key must be provided")
+		}
+	}
+
+	return nil
+}
+
 var cronParser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 
 func ValidateScheduleCriteria(c *model.ScheduleFilterCriteria) error {
