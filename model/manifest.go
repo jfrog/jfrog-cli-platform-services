@@ -1,7 +1,10 @@
 package model
 
 type ArtifactFilterCriteria struct {
-	RepoKeys []string `json:"repoKeys,omitempty"`
+	RepoKeys     []string `json:"repoKeys,omitempty"`
+	AnyLocal     bool     `json:"anyLocal,omitempty"`
+	AnyFederated bool     `json:"anyFederated,omitempty"`
+	AnyRemote    bool     `json:"anyRemote,omitempty"`
 }
 
 type ScheduleFilterCriteria struct {
@@ -10,8 +13,8 @@ type ScheduleFilterCriteria struct {
 }
 
 type FilterCriteria struct {
-	ArtifactFilterCriteria ArtifactFilterCriteria `json:"artifactFilterCriteria,omitempty"`
-	Schedule               ScheduleFilterCriteria `json:"schedule,omitempty"`
+	ArtifactFilterCriteria *ArtifactFilterCriteria `json:"artifactFilterCriteria,omitempty"`
+	Schedule               *ScheduleFilterCriteria `json:"schedule,omitempty"`
 }
 
 type Secrets map[string]string

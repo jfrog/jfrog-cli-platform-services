@@ -15,15 +15,15 @@ import (
 )
 
 type deployRequest struct {
-	Key            string               `json:"key"`
-	Description    string               `json:"description"`
-	Enabled        bool                 `json:"enabled"`
-	Debug          bool                 `json:"debug"`
-	SourceCode     string               `json:"sourceCode"`
-	Action         string               `json:"action"`
-	FilterCriteria model.FilterCriteria `json:"filterCriteria,omitempty"`
-	Secrets        []*model.Secret      `json:"secrets"`
-	ProjectKey     string               `json:"projectKey"`
+	Key            string                `json:"key"`
+	Description    string                `json:"description"`
+	Enabled        bool                  `json:"enabled"`
+	Debug          bool                  `json:"debug"`
+	SourceCode     string                `json:"sourceCode"`
+	Action         string                `json:"action"`
+	FilterCriteria *model.FilterCriteria `json:"filterCriteria,omitempty"`
+	Secrets        []*model.Secret       `json:"secrets"`
+	ProjectKey     string                `json:"projectKey"`
 }
 
 func GetDeployCommand() components.Command {
@@ -61,10 +61,8 @@ func GetDeployCommand() components.Command {
 				return err
 			}
 
-			if actionMeta.MandatoryFilter && actionMeta.FilterType == model.FilterTypeSchedule {
-				if err = common.ValidateScheduleCriteria(&manifest.FilterCriteria.Schedule); err != nil {
-					return fmt.Errorf("manifest validation failed: %w", err)
-				}
+			if err = common.ValidateFilterCriteria(&manifest.FilterCriteria, actionMeta); err != nil {
+				return err
 			}
 
 			if !c.GetBoolFlagValue(model.FlagNoSecrets) {
@@ -73,18 +71,18 @@ func GetDeployCommand() components.Command {
 				}
 			}
 
-			return runDeployCommand(c, manifest, server.GetUrl(), server.GetAccessToken())
+			return runDeployCommand(c, manifest, actionMeta, server.GetUrl(), server.GetAccessToken())
 		},
 	}
 }
 
-func runDeployCommand(ctx *components.Context, manifest *model.Manifest, serverUrl string, token string) error {
+func runDeployCommand(ctx *components.Context, manifest *model.Manifest, actionMeta *model.ActionMetadata, serverUrl string, token string) error {
 	existingWorker, err := common.FetchWorkerDetails(ctx, serverUrl, token, manifest.Name, manifest.ProjectKey)
 	if err != nil {
 		return err
 	}
 
-	body, err := prepareDeployRequest(ctx, manifest, existingWorker)
+	body, err := prepareDeployRequest(ctx, manifest, actionMeta, existingWorker)
 	if err != nil {
 		return err
 	}
@@ -126,7 +124,7 @@ func runDeployCommand(ctx *components.Context, manifest *model.Manifest, serverU
 	return err
 }
 
-func prepareDeployRequest(ctx *components.Context, manifest *model.Manifest, existingWorker *model.WorkerDetails) (*deployRequest, error) {
+func prepareDeployRequest(ctx *components.Context, manifest *model.Manifest, actionMeta *model.ActionMetadata, existingWorker *model.WorkerDetails) (*deployRequest, error) {
 	sourceCode, err := common.ReadSourceCode(manifest)
 	if err != nil {
 		return nil, err
@@ -140,15 +138,18 @@ func prepareDeployRequest(ctx *components.Context, manifest *model.Manifest, exi
 	}
 
 	payload := &deployRequest{
-		Key:            manifest.Name,
-		Action:         manifest.Action,
-		Description:    manifest.Description,
-		Enabled:        manifest.Enabled,
-		Debug:          manifest.Debug,
-		FilterCriteria: manifest.FilterCriteria,
-		SourceCode:     sourceCode,
-		Secrets:        secrets,
-		ProjectKey:     manifest.ProjectKey,
+		Key:         manifest.Name,
+		Action:      manifest.Action,
+		Description: manifest.Description,
+		Enabled:     manifest.Enabled,
+		Debug:       manifest.Debug,
+		SourceCode:  sourceCode,
+		Secrets:     secrets,
+		ProjectKey:  manifest.ProjectKey,
+	}
+
+	if actionMeta.MandatoryFilter {
+		payload.FilterCriteria = &manifest.FilterCriteria
 	}
 
 	return payload, nil

@@ -50,12 +50,12 @@ func (c *editScheduleCommand) run() error {
 		return fmt.Errorf("the worker is not a SCHEDULED_EVENT worker")
 	}
 
-	newCriteria := model.ScheduleFilterCriteria{
+	newCriteria := &model.ScheduleFilterCriteria{
 		Cron:     c.ctx.GetStringFlagValue(flagScheduleCron),
 		Timezone: c.ctx.GetStringFlagValue(flagScheduleTimezone),
 	}
 
-	if err = common.ValidateScheduleCriteria(&newCriteria); err != nil {
+	if err = common.ValidateScheduleCriteria(newCriteria); err != nil {
 		return fmt.Errorf("invalid schedule provided: %w", err)
 	}
 

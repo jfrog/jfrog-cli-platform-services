@@ -30,7 +30,7 @@ var manifestSample = &model.Manifest{
 		"hidden2": "hidden2.value",
 	},
 	FilterCriteria: model.FilterCriteria{
-		ArtifactFilterCriteria: model.ArtifactFilterCriteria{
+		ArtifactFilterCriteria: &model.ArtifactFilterCriteria{
 			RepoKeys: []string{
 				"my-repo-local",
 			},
@@ -289,6 +289,123 @@ func TestManifest_DecryptSecrets(t *testing.T) {
 			})
 
 			tt.assert(t, mf, DecryptManifestSecrets(mf))
+		})
+	}
+}
+
+func TestManifest_ValidateFilterCriteria(t *testing.T) {
+	tests := []struct {
+		name       string
+		criteria   *model.FilterCriteria
+		actionMeta *model.ActionMetadata
+		wantErr    error
+	}{
+		{
+			name: "no mandatory filters",
+			actionMeta: &model.ActionMetadata{
+				FilterType:      model.FilterTypeSchedule,
+				MandatoryFilter: false,
+			},
+			criteria: &model.FilterCriteria{
+				Schedule:               &model.ScheduleFilterCriteria{},
+				ArtifactFilterCriteria: &model.ArtifactFilterCriteria{},
+			},
+		},
+		{
+			name: "valid schedule criteria",
+			actionMeta: &model.ActionMetadata{
+				FilterType:      model.FilterTypeSchedule,
+				MandatoryFilter: true,
+			},
+			criteria: &model.FilterCriteria{
+				Schedule: &model.ScheduleFilterCriteria{
+					Cron:     "0 1 1 * *",
+					Timezone: "UTC",
+				},
+			},
+		},
+		{
+			name: "valid artifact filter criteria",
+			actionMeta: &model.ActionMetadata{
+				FilterType:      model.FilterTypeRepo,
+				MandatoryFilter: true,
+			},
+			criteria: &model.FilterCriteria{
+				ArtifactFilterCriteria: &model.ArtifactFilterCriteria{
+					RepoKeys: []string{"my-repo-local"},
+				},
+			},
+		},
+		{
+			name: "valid with any local",
+			actionMeta: &model.ActionMetadata{
+				FilterType:      model.FilterTypeRepo,
+				MandatoryFilter: true,
+			},
+			criteria: &model.FilterCriteria{
+				ArtifactFilterCriteria: &model.ArtifactFilterCriteria{
+					AnyLocal: true,
+				},
+			},
+		},
+		{
+			name: "valid with any federated",
+			actionMeta: &model.ActionMetadata{
+				FilterType:      model.FilterTypeRepo,
+				MandatoryFilter: true,
+			},
+			criteria: &model.FilterCriteria{
+				ArtifactFilterCriteria: &model.ArtifactFilterCriteria{
+					AnyFederated: true,
+				},
+			},
+		},
+		{
+			name: "valid with any local",
+			actionMeta: &model.ActionMetadata{
+				FilterType:      model.FilterTypeRepo,
+				MandatoryFilter: true,
+			},
+			criteria: &model.FilterCriteria{
+				ArtifactFilterCriteria: &model.ArtifactFilterCriteria{
+					AnyRemote: true,
+				},
+			},
+		},
+		{
+			name: "only schedule for scheduled action",
+			actionMeta: &model.ActionMetadata{
+				FilterType:      model.FilterTypeSchedule,
+				MandatoryFilter: true,
+			},
+			criteria: &model.FilterCriteria{
+				Schedule:               &model.ScheduleFilterCriteria{},
+				ArtifactFilterCriteria: &model.ArtifactFilterCriteria{},
+			},
+			wantErr: invalidManifestErr("scheduled event cannot have artifact filter criteria"),
+		},
+		{
+			name: "only artifactFilterCriteria for non-scheduled action",
+			actionMeta: &model.ActionMetadata{
+				FilterType:      model.FilterTypeRepo,
+				MandatoryFilter: true,
+			},
+			criteria: &model.FilterCriteria{
+				Schedule:               &model.ScheduleFilterCriteria{},
+				ArtifactFilterCriteria: &model.ArtifactFilterCriteria{},
+			},
+			wantErr: invalidManifestErr("repository events cannot have schedule criteria"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateFilterCriteria(tt.criteria, tt.actionMeta)
+			if tt.wantErr == nil {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.wantErr.Error())
+			}
 		})
 	}
 }
