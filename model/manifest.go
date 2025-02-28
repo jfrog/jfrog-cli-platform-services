@@ -20,14 +20,14 @@ type FilterCriteria struct {
 type Secrets map[string]string
 
 type Manifest struct {
-	Name           string         `json:"name"`
-	Description    string         `json:"description"`
-	SourceCodePath string         `json:"sourceCodePath"`
-	Action         string         `json:"action"`
-	Enabled        bool           `json:"enabled"`
-	Debug          bool           `json:"debug"`
-	ProjectKey     string         `json:"projectKey"`
-	Secrets        Secrets        `json:"secrets"`
-	FilterCriteria FilterCriteria `json:"filterCriteria,omitempty"`
-	Application    string         `json:"application,omitempty"`
+	Name           string          `json:"name"`
+	Description    string          `json:"description"`
+	SourceCodePath string          `json:"sourceCodePath"`
+	Action         string          `json:"action"`
+	Enabled        bool            `json:"enabled"`
+	Debug          bool            `json:"debug"`
+	ProjectKey     string          `json:"projectKey"`
+	Secrets        Secrets         `json:"secrets"`
+	FilterCriteria *FilterCriteria `json:"filterCriteria,omitempty"`
+	Application    string          `json:"application,omitempty"`
 }

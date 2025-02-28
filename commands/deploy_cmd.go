@@ -61,7 +61,7 @@ func GetDeployCommand() components.Command {
 				return err
 			}
 
-			if err = common.ValidateFilterCriteria(&manifest.FilterCriteria, actionMeta); err != nil {
+			if err = common.ValidateFilterCriteria(manifest.FilterCriteria, actionMeta); err != nil {
 				return err
 			}
 
@@ -149,7 +149,7 @@ func prepareDeployRequest(ctx *components.Context, manifest *model.Manifest, act
 	}
 
 	if actionMeta.MandatoryFilter {
-		payload.FilterCriteria = &manifest.FilterCriteria
+		payload.FilterCriteria = manifest.FilterCriteria
 	}
 
 	return payload, nil

@@ -115,9 +115,11 @@ func TestDeployCommand(t *testing.T) {
 			workerName:     "wk-3",
 			serverBehavior: common.NewServerStub(t).WithGetOneEndpoint(),
 			patchManifest: func(mf *model.Manifest) {
-				mf.FilterCriteria.Schedule = &model.ScheduleFilterCriteria{
-					Cron:     "1h",
-					Timezone: "Asia/New_York",
+				mf.FilterCriteria = &model.FilterCriteria{
+					Schedule: &model.ScheduleFilterCriteria{
+						Cron:     "1h",
+						Timezone: "Asia/New_York",
+					},
 				}
 			},
 			wantErr: errors.New("manifest validation failed: invalid cron expression"),

@@ -29,7 +29,7 @@ var manifestSample = &model.Manifest{
 		"hidden1": "hidden1.value",
 		"hidden2": "hidden2.value",
 	},
-	FilterCriteria: model.FilterCriteria{
+	FilterCriteria: &model.FilterCriteria{
 		ArtifactFilterCriteria: &model.ArtifactFilterCriteria{
 			RepoKeys: []string{
 				"my-repo-local",
