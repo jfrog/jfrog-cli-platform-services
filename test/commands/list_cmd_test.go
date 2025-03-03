@@ -53,7 +53,7 @@ func TestListCommand(t *testing.T) {
 			Enabled:     true,
 			SourceCode:  `export default async function() { return { "status": "OK" } }`,
 			Action:      "BEFORE_DOWNLOAD",
-			FilterCriteria: model.FilterCriteria{
+			FilterCriteria: &model.FilterCriteria{
 				ArtifactFilterCriteria: &model.ArtifactFilterCriteria{
 					RepoKeys: []string{"example-repo-local"},
 				},

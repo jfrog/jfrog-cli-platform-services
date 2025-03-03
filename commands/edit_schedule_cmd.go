@@ -59,7 +59,9 @@ func (c *editScheduleCommand) run() error {
 		return fmt.Errorf("invalid schedule provided: %w", err)
 	}
 
-	manifest.FilterCriteria.Schedule = newCriteria
+	manifest.FilterCriteria = &model.FilterCriteria{
+		Schedule: newCriteria,
+	}
 
 	if err = common.SaveManifest(manifest); err != nil {
 		return fmt.Errorf("failed to save manifest: %w", err)

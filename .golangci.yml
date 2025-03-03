@@ -37,9 +37,8 @@ linters-settings:
         # https://staticcheck.io/docs/options#checks
         checks: [ "all","-SA1019","-SA1029" ]
     gosec:
-        excludes: ["G204", "G301", "G302", "G304", "G306", "G601", "G101", "G407"]
+        excludes: ["G204", "G301", "G302", "G304", "G306", "G601", "G101"]
         exclude-generated: true
-        exclude-test-files: true
         config:
             global:
                 nosec: true
