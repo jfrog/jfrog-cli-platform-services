@@ -24,6 +24,7 @@ func getApp() components.App {
 		commands.GetAddSecretCommand(),
 		commands.GetListEventsCommand(),
 		commands.GetEditScheduleCommand(),
+		commands.GetShowExecutionHistoryCommand(),
 	}
 	return app
 }

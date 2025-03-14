@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +18,10 @@ import (
 	"github.com/jfrog/jfrog-cli-platform-services/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	EndpointExecutionHistory = "/worker/api/v1/execution_history"
 )
 
 type BodyValidator func(t require.TestingT, content []byte)
@@ -62,22 +67,43 @@ func NewMockWorkerServer(t *testing.T, stubs ...*ServerStub) (*mockhttp.Server, 
 	return server, token
 }
 
+type queryParamStub struct {
+	value string
+	paths []string
+}
+
+type ExecutionHistoryResultEntryStub struct {
+	Result string `json:"result"`
+	Logs   string `json:"logs"`
+}
+
+type ExecutionHistoryEntryStub struct {
+	Start   time.Time                       `json:"start"`
+	End     time.Time                       `json:"end"`
+	TestRun bool                            `json:"testRun"`
+	Result  ExecutionHistoryResultEntryStub `json:"entries"`
+}
+
+type ExecutionHistoryStub []*ExecutionHistoryEntryStub
+
 func NewServerStub(t *testing.T) *ServerStub {
 	return &ServerStub{
-		test:        t,
-		workers:     map[string]*model.WorkerDetails{},
-		queryParams: map[string]string{},
+		test:             t,
+		workers:          map[string]*model.WorkerDetails{},
+		queryParams:      map[string]queryParamStub{},
+		executionHistory: map[string]ExecutionHistoryStub{},
 	}
 }
 
 type ServerStub struct {
-	test        *testing.T
-	waitFor     time.Duration
-	token       string
-	projectKey  string
-	workers     map[string]*model.WorkerDetails
-	endpoints   []mockhttp.ServerEndpoint
-	queryParams map[string]string
+	test             *testing.T
+	waitFor          time.Duration
+	token            string
+	projectKey       *queryParamStub
+	workers          map[string]*model.WorkerDetails
+	executionHistory map[string]ExecutionHistoryStub
+	endpoints        []mockhttp.ServerEndpoint
+	queryParams      map[string]queryParamStub
 }
 
 func (s *ServerStub) WithT(t *testing.T) *ServerStub {
@@ -95,13 +121,16 @@ func (s *ServerStub) WithToken(token string) *ServerStub {
 	return s
 }
 
-func (s *ServerStub) WithProjectKey(projectKey string) *ServerStub {
-	s.projectKey = projectKey
+func (s *ServerStub) WithProjectKey(projectKey string, paths ...string) *ServerStub {
+	s.projectKey = &queryParamStub{
+		value: projectKey,
+		paths: paths,
+	}
 	return s
 }
 
-func (s *ServerStub) WithQueryParam(name, value string) *ServerStub {
-	s.queryParams[name] = value
+func (s *ServerStub) WithQueryParam(name, value string, paths ...string) *ServerStub {
+	s.queryParams[name] = queryParamStub{value: value, paths: paths}
 	return s
 }
 
@@ -109,6 +138,11 @@ func (s *ServerStub) WithWorkers(workers ...*model.WorkerDetails) *ServerStub {
 	for _, worker := range workers {
 		s.workers[worker.Key] = worker
 	}
+	return s
+}
+
+func (s *ServerStub) WithWorkerExecutionHistory(workerKey string, history ExecutionHistoryStub) *ServerStub {
+	s.executionHistory[workerKey] = history
 	return s
 }
 
@@ -222,6 +256,19 @@ func (s *ServerStub) WithGetAllEndpoint() *ServerStub {
 	return s
 }
 
+func (s *ServerStub) WithGetExecutionHistoryEndpoint() *ServerStub {
+	s.endpoints = append(s.endpoints,
+		mockhttp.NewServerEndpoint().
+			When(
+				mockhttp.Request().
+					Method(http.MethodGet).
+					Path(EndpointExecutionHistory),
+			).
+			HandleWith(s.handleGetExecutionHistory),
+	)
+	return s
+}
+
 func (s *ServerStub) handleGetAll(res http.ResponseWriter, req *http.Request) {
 	s.applyDelay()
 
@@ -281,6 +328,48 @@ func (s *ServerStub) handleGetOne(res http.ResponseWriter, req *http.Request) {
 	}
 
 	_, err := res.Write([]byte(MustJsonMarshal(s.test, workerDetails)))
+	require.NoError(s.test, err)
+}
+
+func (s *ServerStub) handleGetExecutionHistory(res http.ResponseWriter, req *http.Request) {
+	s.applyDelay()
+
+	if !s.validateToken(res, req) {
+		return
+	}
+
+	if !s.validateProjectKey(res, req) {
+		return
+	}
+
+	if !s.validateQueryParams(res, req) {
+		return
+	}
+
+	workerKey := req.URL.Query().Get("workerKey")
+
+	executionHistory, hasHistory := s.executionHistory[workerKey]
+	if !hasHistory {
+		executionHistory = ExecutionHistoryStub{}
+	}
+
+	showTestRun := req.URL.Query().Get("showTestRun") == "true"
+
+	newHistory := make(ExecutionHistoryStub, 0, len(executionHistory))
+	for _, entry := range executionHistory {
+		if entry.TestRun {
+			if showTestRun {
+				newHistory = append(newHistory, entry)
+			}
+		} else {
+			newHistory = append(newHistory, entry)
+		}
+	}
+	executionHistory = newHistory
+
+	res.Header().Set("Content-Type", "application/json")
+
+	_, err := res.Write([]byte(MustJsonMarshal(s.test, executionHistory)))
 	require.NoError(s.test, err)
 }
 
@@ -408,9 +497,9 @@ func (s *ServerStub) validateToken(res http.ResponseWriter, req *http.Request) b
 }
 
 func (s *ServerStub) validateProjectKey(res http.ResponseWriter, req *http.Request) bool {
-	if s.projectKey != "" {
+	if s.projectKey != nil && (len(s.projectKey.paths) == 0 || slices.Contains(s.projectKey.paths, req.URL.Path)) {
 		gotProjectKey := req.URL.Query().Get("projectKey")
-		if s.projectKey == gotProjectKey {
+		if s.projectKey.value == gotProjectKey {
 			return true
 		}
 		res.WriteHeader(http.StatusForbidden)
@@ -421,13 +510,21 @@ func (s *ServerStub) validateProjectKey(res http.ResponseWriter, req *http.Reque
 }
 
 func (s *ServerStub) validateQueryParams(res http.ResponseWriter, req *http.Request) bool {
-	for key, value := range s.queryParams {
-		gotValue := req.URL.Query().Get(key)
-		if value == gotValue {
-			return true
+	for key, stub := range s.queryParams {
+		if len(stub.paths) > 0 && !slices.Contains(stub.paths, req.URL.Path) {
+			// We only check the query param if the path is in the list
+			continue
 		}
+
+		gotValue := req.URL.Query().Get(key)
+		if stub.value == gotValue {
+			continue
+		}
+
 		res.WriteHeader(http.StatusBadRequest)
-		assert.FailNow(s.test, fmt.Sprintf("Invalid query params %s want=%s, got=%s", key, value, gotValue))
+
+		assert.FailNow(s.test, fmt.Sprintf("Invalid query params %s want=%s, got=%s", key, stub, gotValue))
+
 		return false
 	}
 	return true
