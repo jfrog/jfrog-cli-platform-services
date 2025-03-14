@@ -217,12 +217,10 @@ func AssertOutputJson[T any](wantResponse T) AssertOutputFunc {
 	return func(t *testing.T, output []byte, err error) {
 		require.NoError(t, err)
 
-		outputData := new(T)
-
-		err = json.Unmarshal(output, outputData)
+		wantJson, err := json.Marshal(wantResponse)
 		require.NoError(t, err)
 
-		assert.Equal(t, wantResponse, *outputData)
+		assert.JSONEq(t, string(wantJson), string(output))
 	}
 }
 

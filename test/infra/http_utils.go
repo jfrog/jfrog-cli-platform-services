@@ -29,6 +29,7 @@ type HttpRequest struct {
 	basicAuth  *basicAuth
 	bodyReader io.Reader
 	headers    map[string]string
+	query      url.Values
 	reqContext context.Context
 	url        string
 }
@@ -48,9 +49,14 @@ type HttpExecutor struct {
 func (h *HttpRequest) getUrl(endpoint string) string {
 	baseUrl := h.url
 	if h.url == "" {
-		return "http://localhost:8082"
+		baseUrl = "http://localhost:8082"
 	}
-	return strings.TrimSuffix(baseUrl, "/") + "/" + strings.TrimPrefix(endpoint, "/")
+	u := strings.TrimSuffix(baseUrl, "/") + "/" + strings.TrimPrefix(endpoint, "/")
+	query := h.query.Encode()
+	if query != "" {
+		u += "?" + query
+	}
+	return u
 }
 
 func (h *HttpRequest) Get(endpoint string) *HttpExecutor {
@@ -151,6 +157,14 @@ func (h *HttpRequest) WithBasicAuth(username string, password string) *HttpReque
 	return h
 }
 
+func (h *HttpRequest) WithQueryParam(name, value string) *HttpRequest {
+	if h.query == nil {
+		h.query = url.Values{}
+	}
+	h.query.Add(name, value)
+	return h
+}
+
 func (h *HttpRequest) WithFormData(params map[string]string) *HttpRequest {
 	values := url.Values{}
 	for k, v := range params {
@@ -171,7 +185,7 @@ func (h *HttpRequest) WithJsonBytes(jsonBytes []byte) *HttpRequest {
 }
 
 func (h *HttpRequest) WithJsonString(jsonString string) *HttpRequest {
-	h.headers["Content-Type"] = "application/json; charset=UTF-8"
+	h.headers["Content-Type"] = "application/json"
 	return h.WithBody(strings.NewReader(jsonString))
 }
 

@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"path"
@@ -225,6 +226,46 @@ func (it *Test) DeleteWorker(workerKey string) {
 	} else {
 		it.Logf("Deleted worker '%s'", workerKey)
 	}
+}
+
+func (it *Test) ResetOutput() {
+	if it.output != nil {
+		it.output.Reset()
+	}
+}
+
+func (it *Test) ExecuteWorker(workerKey string, payload any) {
+	ctx, cancelCtx := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancelCtx()
+
+	it.NewHttpRequestWithContext(ctx).
+		WithAccessToken().
+		WithJsonData(payload).
+		Post("/worker/api/v1/execute/" + workerKey).
+		Do().
+		IsOk()
+}
+
+func (it *Test) TestRunWorker(workerKey string, application, event string, code string, payload any, debug bool) {
+	ctx, cancelCtx := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancelCtx()
+
+	it.Logf("Executing worker '%s'", workerKey)
+
+	it.NewHttpRequestWithContext(ctx).
+		WithAccessToken().
+		WithQueryParam("debug", fmt.Sprint(debug)).
+		WithJsonData(map[string]any{
+			"code": code,
+			"data": payload,
+			"action": map[string]string{
+				"application": application,
+				"name":        event,
+			},
+		}).
+		Post("/worker/api/v2/test/" + workerKey).
+		Do().
+		IsOk()
 }
 
 func (it *Test) DeleteAllWorkers() {
