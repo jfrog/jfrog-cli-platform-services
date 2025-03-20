@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strings"
 	"testing"
 	"time"
 
@@ -44,7 +45,15 @@ type Test struct {
 	t           *testing.T
 }
 
-const requestTimeout = 5 * time.Second
+const (
+	requestTimeout      = 5 * time.Second
+	defaultRetryBackoff = 250 * time.Millisecond
+	defaultRetryTimeout = 2 * time.Second
+)
+
+var defaultRetryCommandOnErrors = []string{
+	"returned an unexpected status code 502",
+}
 
 var runPlugin = plugins.RunCliWithPlugin(getApp())
 
@@ -159,12 +168,43 @@ func (it *Test) PrepareWorkerTestDir() (string, string) {
 }
 
 func (it *Test) RunCommand(args ...string) error {
+	return it.RetryCommand(args, defaultRetryBackoff, defaultRetryTimeout, defaultRetryCommandOnErrors)
+}
+
+func (it *Test) RetryCommand(args []string, backoff time.Duration, timeout time.Duration, onErrorContaining []string) error {
 	oldArgs := os.Args
 	defer func() {
 		os.Args = oldArgs
 	}()
 	os.Args = args
-	return runPlugin()
+
+	start := time.Now()
+	err := runPlugin()
+	elapsed := time.Since(start)
+
+	waitDuration := max(backoff, 250*time.Millisecond)
+
+	for shouldRetryCommandOnError(err, onErrorContaining) && elapsed < timeout {
+		time.Sleep(waitDuration)
+		err = runPlugin()
+		elapsed = time.Since(start)
+	}
+
+	return err
+}
+
+func shouldRetryCommandOnError(err error, onErrorContaining []string) bool {
+	if err == nil || len(onErrorContaining) == 0 {
+		return false
+	}
+
+	for _, s := range onErrorContaining {
+		if strings.Contains(err.Error(), s) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (it *Test) CapturedOutput() []byte {
@@ -185,6 +225,7 @@ func (it *Test) GetAllWorkers() []*model.WorkerDetails {
 	it.NewHttpRequestWithContext(ctx).
 		WithAccessToken().
 		Get("/worker/api/v1/workers").
+		WithRetries(defaultRetryBackoff, defaultRetryTimeout, http.StatusBadGateway).
 		Do().
 		AsObject(&response)
 
@@ -204,6 +245,7 @@ func (it *Test) CreateWorker(createRequest *model.WorkerDetails) {
 		WithAccessToken().
 		WithJsonBytes(jsonBytes).
 		Post("/worker/api/v1/workers").
+		WithRetries(defaultRetryBackoff, defaultRetryTimeout, http.StatusBadGateway).
 		Do().
 		IsCreated()
 }
@@ -216,7 +258,8 @@ func (it *Test) DeleteWorker(workerKey string) {
 
 	status := it.NewHttpRequestWithContext(ctx).
 		WithAccessToken().
-		Delete("/worker/api/v1/workers/" + workerKey).
+		Delete("/worker/api/v1/workers/"+workerKey).
+		WithRetries(defaultRetryBackoff, defaultRetryTimeout, http.StatusBadGateway).
 		Do().
 		StatusCode()
 

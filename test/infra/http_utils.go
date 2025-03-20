@@ -9,7 +9,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -41,8 +43,11 @@ type HttpResponse struct {
 }
 
 type HttpExecutor struct {
-	it      *Test
-	request *http.Request
+	it              *Test
+	request         *http.Request
+	retryOnStatuses []int
+	retryBackoff    time.Duration
+	retryTimeout    time.Duration
 }
 
 func (h *HttpRequest) getUrl(endpoint string) string {
@@ -109,20 +114,43 @@ func (h *HttpRequest) executor(req *http.Request) *HttpExecutor {
 	}
 }
 
+func (h *HttpExecutor) WithRetries(backoff, timeout time.Duration, statuses ...int) *HttpExecutor {
+	h.retryBackoff = backoff
+	h.retryTimeout = timeout
+	h.retryOnStatuses = statuses
+	return h
+}
+
 func (h *HttpExecutor) Do() *HttpResponse {
-	resp, err := http.DefaultClient.Do(h.request)
+	resp, err := h.doWithRetries()
 	require.NoError(h.it, err)
-	return &HttpResponse{
-		it:       h.it,
-		response: resp,
-	}
+	return resp
 }
 
 func (h *HttpExecutor) DoAndCaptureError() (*HttpResponse, error) {
+	return h.doWithRetries()
+}
+
+func (h *HttpExecutor) doWithRetries() (*HttpResponse, error) {
+	start := time.Now()
+
 	resp, err := http.DefaultClient.Do(h.request)
 	if err != nil {
 		return nil, err
 	}
+
+	elapsed := time.Since(start)
+	backoff := max(250*time.Millisecond, h.retryBackoff)
+
+	for slices.Index(h.retryOnStatuses, resp.StatusCode) > -1 && elapsed < h.retryTimeout {
+		time.Sleep(backoff)
+		resp, err = http.DefaultClient.Do(h.request)
+		if err != nil {
+			return nil, err
+		}
+		elapsed = time.Since(start)
+	}
+
 	return &HttpResponse{
 		it:       h.it,
 		response: resp,
