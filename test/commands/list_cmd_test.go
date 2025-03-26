@@ -168,7 +168,7 @@ func assertWorkerListJSON(workers ...*model.WorkerDetails) func(t require.Testin
 
 		require.NoError(t, json.Unmarshal(content, &gotWorkers))
 
-		assert.Equalf(t, len(workers), len(gotWorkers.Workers), "Length mismatch")
+		require.Equalf(t, len(workers), len(gotWorkers.Workers), "Length mismatch")
 
 		common.SortWorkers(workers)
 		common.SortWorkers(gotWorkers.Workers)
