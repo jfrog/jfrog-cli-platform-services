@@ -42,7 +42,9 @@ type Test struct {
 	AccessToken string
 	dataDir     string
 	platformUrl string
-	output      *bytes.Buffer
+	input       string
+	stdout      *bytes.Buffer
+	stdin       *bytes.Reader
 	t           *testing.T
 }
 
@@ -124,10 +126,12 @@ func runTest(t *testing.T, testSpec TestDefinition) {
 		AccessToken: accessToken,
 		dataDir:     homeDir,
 		platformUrl: platformUrl,
+		input:       testSpec.Input,
 	}
 
 	if testSpec.Input != "" {
-		common.SetCliIn(bytes.NewReader([]byte(testSpec.Input)))
+		it.stdin = bytes.NewReader([]byte(testSpec.Input))
+		common.SetCliIn(it.stdin)
 		t.Cleanup(func() {
 			common.SetCliIn(os.Stdin)
 		})
@@ -139,7 +143,7 @@ func runTest(t *testing.T, testSpec TestDefinition) {
 		t.Cleanup(func() {
 			common.SetCliOut(os.Stdout)
 		})
-		it.output = &newOutput
+		it.stdout = &newOutput
 	}
 
 	testSpec.Test(it)
@@ -187,6 +191,7 @@ func (it *Test) RetryCommand(args []string, backoff time.Duration, timeout time.
 
 	for shouldRetryCommandOnError(err, onErrorContaining) && elapsed < timeout {
 		time.Sleep(waitDuration)
+		it.ResetIO()
 		err = runPlugin()
 		elapsed = time.Since(start)
 	}
@@ -209,8 +214,8 @@ func shouldRetryCommandOnError(err error, onErrorContaining []string) bool {
 }
 
 func (it *Test) CapturedOutput() []byte {
-	if it.output != nil {
-		return it.output.Bytes()
+	if it.stdout != nil {
+		return it.stdout.Bytes()
 	}
 	return nil
 }
@@ -271,9 +276,12 @@ func (it *Test) DeleteWorker(workerKey string) {
 	}
 }
 
-func (it *Test) ResetOutput() {
-	if it.output != nil {
-		it.output.Reset()
+func (it *Test) ResetIO() {
+	if it.stdin != nil {
+		it.stdin.Reset([]byte(it.input))
+	}
+	if it.stdout != nil {
+		it.stdout.Reset()
 	}
 }
 
@@ -347,7 +355,7 @@ func (it *Test) Helper() {
 
 func (it *Test) Run(name string, f func(t *Test)) bool {
 	return it.t.Run(name, func(t *testing.T) {
-		f(&Test{t: t, ServerId: it.ServerId, AccessToken: it.AccessToken, dataDir: it.dataDir, output: it.output})
+		f(&Test{t: t, ServerId: it.ServerId, AccessToken: it.AccessToken, dataDir: it.dataDir, stdout: it.stdout, stdin: it.stdin, input: it.input})
 	})
 }
 
