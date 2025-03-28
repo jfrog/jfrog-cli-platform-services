@@ -67,7 +67,7 @@ func TestShowExecutionHistory(t *testing.T) {
 
 				for _, tt := range tests {
 					it.Run(tt.name, func(t *infra.Test) {
-						it.ResetOutput()
+						it.ResetIO()
 						tt.test(t, workerKey)
 					})
 				}
