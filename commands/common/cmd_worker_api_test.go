@@ -105,3 +105,11 @@ func TestFetchActions(t *testing.T) {
 		})
 	}
 }
+
+func TestFetchOptions(t *testing.T) {
+	samples := LoadSampleOptions(t)
+	s, token := NewMockWorkerServer(t, NewServerStub(t).WithOptionsEndpoint().WithT(t))
+	got, err := FetchOptions(IntFlagMap{}, s.BaseUrl(), token)
+	require.NoError(t, err)
+	assert.Equal(t, got, samples)
+}

@@ -20,10 +20,11 @@ type deployRequest struct {
 	Enabled        bool                  `json:"enabled"`
 	Debug          bool                  `json:"debug"`
 	SourceCode     string                `json:"sourceCode"`
-	Action         string                `json:"action"`
+	Action         model.Action          `json:"action"`
 	FilterCriteria *model.FilterCriteria `json:"filterCriteria,omitempty"`
 	Secrets        []*model.Secret       `json:"secrets"`
 	ProjectKey     string                `json:"projectKey"`
+	Version        *model.Version        `json:"version,omitempty"`
 }
 
 func GetDeployCommand() components.Command {
@@ -35,6 +36,9 @@ func GetDeployCommand() components.Command {
 			plugins_common.GetServerIdFlag(),
 			model.GetTimeoutFlag(),
 			model.GetNoSecretsFlag(),
+			model.GetChangesVersionFlag(),
+			model.GetChangesDescriptionFlag(),
+			model.GetChangesCommitShaFlag(),
 		},
 		Action: func(c *components.Context) error {
 			server, err := model.GetServerDetails(c)
@@ -71,18 +75,32 @@ func GetDeployCommand() components.Command {
 				}
 			}
 
-			return runDeployCommand(c, manifest, actionMeta, server.GetUrl(), server.GetAccessToken())
+			version := &model.Version{
+				Number:      c.GetStringFlagValue(model.FlagChangesVersion),
+				Description: c.GetStringFlagValue(model.FlagChangesDescription),
+				CommitSha:   c.GetStringFlagValue(model.FlagChangesCommitSha),
+			}
+			if !version.IsEmpty() {
+				options, err := common.FetchOptions(c, server.GetUrl(), server.GetAccessToken())
+				if err != nil {
+					return err
+				}
+				if err = common.ValidateVersion(version, options); err != nil {
+					return err
+				}
+			}
+			return runDeployCommand(c, manifest, actionMeta, version, server.GetUrl(), server.GetAccessToken())
 		},
 	}
 }
 
-func runDeployCommand(ctx *components.Context, manifest *model.Manifest, actionMeta *model.ActionMetadata, serverUrl string, token string) error {
+func runDeployCommand(ctx *components.Context, manifest *model.Manifest, actionMeta *model.ActionMetadata, version *model.Version, serverUrl string, token string) error {
 	existingWorker, err := common.FetchWorkerDetails(ctx, serverUrl, token, manifest.Name, manifest.ProjectKey)
 	if err != nil {
 		return err
 	}
 
-	body, err := prepareDeployRequest(ctx, manifest, actionMeta, existingWorker)
+	body, err := prepareDeployRequest(ctx, manifest, actionMeta, version, existingWorker)
 	if err != nil {
 		return err
 	}
@@ -101,6 +119,7 @@ func runDeployCommand(ctx *components.Context, manifest *model.Manifest, actionM
 			Body:        bodyBytes,
 			OkStatuses:  []int{http.StatusCreated},
 			Path:        []string{"workers"},
+			ApiVersion:  common.ApiVersionV2,
 		})
 		if err == nil {
 			log.Info(fmt.Sprintf("Worker '%s' deployed", manifest.Name))
@@ -116,6 +135,7 @@ func runDeployCommand(ctx *components.Context, manifest *model.Manifest, actionM
 		Body:        bodyBytes,
 		OkStatuses:  []int{http.StatusNoContent},
 		Path:        []string{"workers"},
+		ApiVersion:  common.ApiVersionV2,
 	})
 	if err == nil {
 		log.Info(fmt.Sprintf("Worker '%s' updated", manifest.Name))
@@ -124,7 +144,7 @@ func runDeployCommand(ctx *components.Context, manifest *model.Manifest, actionM
 	return err
 }
 
-func prepareDeployRequest(ctx *components.Context, manifest *model.Manifest, actionMeta *model.ActionMetadata, existingWorker *model.WorkerDetails) (*deployRequest, error) {
+func prepareDeployRequest(ctx *components.Context, manifest *model.Manifest, actionMeta *model.ActionMetadata, version *model.Version, existingWorker *model.WorkerDetails) (*deployRequest, error) {
 	sourceCode, err := common.ReadSourceCode(manifest)
 	if err != nil {
 		return nil, err
@@ -136,21 +156,20 @@ func prepareDeployRequest(ctx *components.Context, manifest *model.Manifest, act
 	if !ctx.GetBoolFlagValue(model.FlagNoSecrets) {
 		secrets = common.PrepareSecretsUpdate(manifest, existingWorker)
 	}
-
 	payload := &deployRequest{
 		Key:         manifest.Name,
-		Action:      manifest.Action,
+		Action:      actionMeta.Action,
 		Description: manifest.Description,
 		Enabled:     manifest.Enabled,
 		Debug:       manifest.Debug,
 		SourceCode:  sourceCode,
 		Secrets:     secrets,
 		ProjectKey:  manifest.ProjectKey,
+		Version:     version,
 	}
 
 	if actionMeta.MandatoryFilter {
 		payload.FilterCriteria = manifest.FilterCriteria
 	}
-
 	return payload, nil
 }

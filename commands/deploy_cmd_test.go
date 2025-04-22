@@ -138,6 +138,39 @@ func TestDeployCommand(t *testing.T) {
 			commandArgs:    []string{"--" + model.FlagTimeout, "abc"},
 			wantErr:        errors.New("invalid timeout provided"),
 		},
+		{
+			name:         "create with version",
+			workerAction: "BEFORE_UPLOAD",
+			workerName:   "wk-0",
+			serverBehavior: common.NewServerStub(t).
+				WithGetOneEndpoint().
+				WithOptionsEndpoint().
+				WithCreateEndpoint(
+					expectDeployRequest(
+						actionsMeta,
+						"wk-0",
+						"BEFORE_UPLOAD",
+						"",
+					),
+				),
+			commandArgs: []string{"--" + model.FlagChangesVersion, "version number", "--" + model.FlagChangesDescription, "version description", "--" + model.FlagChangesCommitSha, "version commitsha"},
+		},
+		{
+			name: "fails when version invalid",
+			serverBehavior: common.NewServerStub(t).
+				WithGetOneEndpoint().
+				WithOptionsEndpoint().
+				WithCreateEndpoint(
+					expectDeployRequest(
+						actionsMeta,
+						"wk-0",
+						"BEFORE_UPLOAD",
+						"",
+					),
+				),
+			commandArgs: []string{"--" + model.FlagChangesVersion, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod."},
+			wantErr:     errors.New("version number exceeds maximum length of 64 characters"),
+		},
 	}
 
 	for _, tt := range tests {
@@ -212,6 +245,9 @@ func getExpectedDeployRequestForAction(
 	workerName, actionName, projectKey string,
 	secrets ...*model.Secret,
 ) *deployRequest {
+	actionMeta, err := actionsMeta.FindAction(actionName)
+	require.NoError(t, err)
+
 	r := &deployRequest{
 		Key:         workerName,
 		Description: "Run a script on " + actionName,
@@ -224,13 +260,10 @@ func getExpectedDeployRequestForAction(
 			"",
 			"worker.ts_template",
 		)),
-		Action:     actionName,
+		Action:     actionMeta.Action,
 		Secrets:    secrets,
 		ProjectKey: projectKey,
 	}
-
-	actionMeta, err := actionsMeta.FindAction(actionName)
-	require.NoError(t, err)
 
 	if actionMeta.MandatoryFilter && actionMeta.FilterType == model.FilterTypeRepo {
 		r.FilterCriteria = &model.FilterCriteria{

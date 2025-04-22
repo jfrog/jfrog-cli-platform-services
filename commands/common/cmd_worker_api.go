@@ -12,7 +12,6 @@ import (
 // FetchWorkerDetails Fetch a worker by its name. Returns nil if the worker does not exist (statusCode=404). Any other statusCode other than 200 will result as an error.
 func FetchWorkerDetails(c model.IntFlagProvider, serverUrl string, accessToken string, workerKey string, projectKey string) (*model.WorkerDetails, error) {
 	details := new(model.WorkerDetails)
-
 	err := CallWorkerApi(c, ApiCallParams{
 		Method:      http.MethodGet,
 		ServerUrl:   serverUrl,
@@ -22,9 +21,9 @@ func FetchWorkerDetails(c model.IntFlagProvider, serverUrl string, accessToken s
 		Path:        []string{"workers", workerKey},
 		OnContent: func(content []byte) error {
 			if len(content) == 0 {
-				log.Debug("No worker details returned from the server")
 				return nil
 			}
+			log.Info(fmt.Sprintf("Worker %s details returned from the server", details.Key))
 			return json.Unmarshal(content, details)
 		},
 	})
@@ -33,9 +32,9 @@ func FetchWorkerDetails(c model.IntFlagProvider, serverUrl string, accessToken s
 	}
 
 	if details.Key == "" {
+		log.Info(fmt.Sprintf("Worker %s does not exist", workerKey))
 		return nil, nil
 	}
-
 	return details, nil
 }
 
@@ -62,5 +61,29 @@ func FetchActions(c model.IntFlagProvider, serverUrl string, accessToken string,
 		return nil, err
 	}
 
+	return metadata, nil
+}
+
+func FetchOptions(c model.IntFlagProvider, serverUrl string, accessToken string) (*OptionsMetadata, error) {
+	metadata := new(OptionsMetadata)
+
+	err := CallWorkerApi(c, ApiCallParams{
+		Method:      http.MethodGet,
+		ServerUrl:   serverUrl,
+		ServerToken: accessToken,
+		OkStatuses:  []int{http.StatusOK},
+		ApiVersion:  ApiVersionV1,
+		Path:        []string{"options"},
+		OnContent: func(content []byte) error {
+			if len(content) == 0 {
+				log.Debug("No options returned from the server")
+				return nil
+			}
+			return json.Unmarshal(content, &metadata)
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("cannot fetch options: %w", err)
+	}
 	return metadata, nil
 }
