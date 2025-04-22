@@ -30,8 +30,8 @@ type Test interface {
 
 const SecretPassword = "P@ssw0rd!"
 
-//go:embed testdata/actions/*
-var sampleActions embed.FS
+//go:embed testdata/*
+var sampleFiles embed.FS
 
 func SetCliIn(reader io.Reader) {
 	cliIn = reader
@@ -159,11 +159,11 @@ func MustEncryptSecret(t require.TestingT, secretValue string, password ...strin
 func LoadSampleActions(t require.TestingT) ActionsMetadata {
 	var metadata ActionsMetadata
 
-	actionsFiles, err := sampleActions.ReadDir("testdata/actions")
+	actionsFiles, err := sampleFiles.ReadDir("testdata/actions")
 	require.NoError(t, err)
 
 	for _, file := range actionsFiles {
-		content, err := sampleActions.ReadFile("testdata/actions/" + file.Name())
+		content, err := sampleFiles.ReadFile("testdata/actions/" + file.Name())
 		require.NoError(t, err)
 
 		action := &model.ActionMetadata{}
@@ -185,6 +185,18 @@ func LoadSampleActionEvents(t require.TestingT) []string {
 	}
 
 	return events
+}
+
+func LoadSampleOptions(t require.TestingT) *OptionsMetadata {
+	// var metadata OptionsMetadata
+
+	content, err := sampleFiles.ReadFile("testdata/options.json")
+	require.NoError(t, err)
+	options := &OptionsMetadata{}
+	err = json.Unmarshal(content, options)
+	require.NoError(t, err)
+
+	return options
 }
 
 func TestSetEnv(t Test, key, value string) {

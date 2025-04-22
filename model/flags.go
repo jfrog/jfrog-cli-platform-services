@@ -14,15 +14,18 @@ import (
 )
 
 const (
-	FlagForce            = "force"
-	FlagNoTest           = "no-test"
-	FlagEdit             = "edit"
-	FlagNoSecrets        = "no-secrets"
-	FlagJsonOutput       = "json"
-	FlagTimeout          = "timeout-ms"
-	FlagProjectKey       = "project-key"
-	FlagApplication      = "application"
-	defaultTimeoutMillis = 5000
+	FlagForce              = "force"
+	FlagNoTest             = "no-test"
+	FlagEdit               = "edit"
+	FlagNoSecrets          = "no-secrets"
+	FlagJsonOutput         = "json"
+	FlagTimeout            = "timeout-ms"
+	FlagProjectKey         = "project-key"
+	FlagApplication        = "application"
+	FlagChangesVersion     = "changes-version"
+	FlagChangesDescription = "changes-description"
+	FlagChangesCommitSha   = "changes-commitsha"
+	defaultTimeoutMillis   = 5000
 )
 
 var (
@@ -102,6 +105,18 @@ func GetApplicationFlag() components.StringFlag {
 		"The application that provides the event. If omitted worker will try to guess it and will raise an error if it cannot.",
 		components.WithStrDefaultValue(""),
 	)
+}
+
+func GetChangesVersionFlag() components.StringFlag {
+	return components.NewStringFlag(FlagChangesVersion, "Version identifier for the worker.", components.WithStrDefaultValue(""))
+}
+
+func GetChangesDescriptionFlag() components.StringFlag {
+	return components.NewStringFlag(FlagChangesDescription, "Description of your changes.", components.WithStrDefaultValue(""))
+}
+
+func GetChangesCommitShaFlag() components.StringFlag {
+	return components.NewStringFlag(FlagChangesCommitSha, "Commit identifier or your change in your VCS.", components.WithStrDefaultValue(""))
 }
 
 func GetServerDetails(c *components.Context) (*config.ServerDetails, error) {

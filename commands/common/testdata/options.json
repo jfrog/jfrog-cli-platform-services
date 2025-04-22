@@ -1,0 +1,12 @@
+{
+  "edition": {
+    "maxCodeChars": 100000,
+    "maxVersionNumberChars": 64,
+    "maxVersionCommitShaChars": 128,
+    "maxVersionDescriptionChars": 256
+  },
+  "minArtifactoryVersionForProjectSupport": "7.95.0",
+  "isTutorialAvailable": false,
+  "isFeedbackEnabled": false,
+  "isHistoryEnabled": true
+}

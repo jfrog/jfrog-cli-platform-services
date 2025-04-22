@@ -26,6 +26,19 @@ const (
 
 type BodyValidator func(t require.TestingT, content []byte)
 
+type workerDeployPayload struct {
+	Key            string                `json:"key"`
+	Description    string                `json:"description"`
+	Enabled        bool                  `json:"enabled"`
+	Debug          bool                  `json:"debug"`
+	SourceCode     string                `json:"sourceCode"`
+	Action         model.Action          `json:"action"`
+	FilterCriteria *model.FilterCriteria `json:"filterCriteria,omitempty"`
+	Secrets        []*model.Secret       `json:"secrets"`
+	ProjectKey     string                `json:"projectKey"`
+	Version        *model.Version        `json:"version,omitempty"`
+}
+
 func ValidateJson(expected any) BodyValidator {
 	return ValidateJsonFunc(expected, func(in any) any {
 		return in
@@ -150,7 +163,7 @@ func (s *ServerStub) WithCreateEndpoint(validateBody BodyValidator) *ServerStub 
 	s.endpoints = append(s.endpoints,
 		mockhttp.NewServerEndpoint().
 			When(
-				mockhttp.Request().POST("/worker/api/v1/workers"),
+				mockhttp.Request().POST("/worker/api/v2/workers"),
 			).
 			HandleWith(s.handleSave(http.StatusCreated, validateBody)),
 	)
@@ -176,7 +189,7 @@ func (s *ServerStub) WithUpdateEndpoint(validateBody BodyValidator) *ServerStub 
 	s.endpoints = append(s.endpoints,
 		mockhttp.NewServerEndpoint().
 			When(
-				mockhttp.Request().PUT("/worker/api/v1/workers"),
+				mockhttp.Request().PUT("/worker/api/v2/workers"),
 			).
 			HandleWith(s.handleSave(http.StatusNoContent, validateBody)),
 	)
@@ -265,6 +278,17 @@ func (s *ServerStub) WithGetExecutionHistoryEndpoint() *ServerStub {
 					Path(EndpointExecutionHistory),
 			).
 			HandleWith(s.handleGetExecutionHistory),
+	)
+	return s
+}
+
+func (s *ServerStub) WithOptionsEndpoint() *ServerStub {
+	s.endpoints = append(s.endpoints,
+		mockhttp.NewServerEndpoint().
+			When(
+				mockhttp.Request().GET("/worker/api/v1/options"),
+			).
+			HandleWith(s.handleGetOptions),
 	)
 	return s
 }
@@ -419,10 +443,12 @@ func (s *ServerStub) handleSave(status int, validateBody BodyValidator) http.Han
 			validateBody(s.test, content)
 		}
 
-		workerDetails := &model.WorkerDetails{}
-		err = json.Unmarshal(content, workerDetails)
+		worker := workerDeployPayload{}
+
+		err = json.Unmarshal(content, &worker)
 		require.NoError(s.test, err)
 
+		workerDetails := mapWorkerSentToWorkerDetails(worker)
 		s.workers[workerDetails.Key] = workerDetails
 
 		res.WriteHeader(status)
@@ -454,6 +480,20 @@ func (s *ServerStub) handleGetAllMetadata(metadata ActionsMetadata) http.Handler
 			s.test.Logf("Failed to write response: %v", err)
 		}
 	}
+}
+
+func (s *ServerStub) handleGetOptions(res http.ResponseWriter, req *http.Request) {
+	s.applyDelay()
+
+	if !s.validateToken(res, req) {
+		return
+	}
+
+	res.WriteHeader(http.StatusOK)
+
+	options := LoadSampleOptions(s.test)
+	_, err := res.Write([]byte(MustJsonMarshal(s.test, options)))
+	require.NoError(s.test, err)
 }
 
 func (s *ServerStub) handle(status int, validateBody BodyValidator, responseBody any) http.HandlerFunc {
@@ -541,5 +581,19 @@ func (s *ServerStub) validateHeader(res http.ResponseWriter, req *http.Request, 
 func (s *ServerStub) applyDelay() {
 	if s.waitFor > 0 {
 		time.Sleep(s.waitFor)
+	}
+}
+
+func mapWorkerSentToWorkerDetails(workerSent workerDeployPayload) *model.WorkerDetails {
+	return &model.WorkerDetails{
+		Key:            workerSent.Key,
+		Description:    workerSent.Description,
+		Enabled:        workerSent.Enabled,
+		Debug:          workerSent.Debug,
+		SourceCode:     workerSent.SourceCode,
+		Action:         workerSent.Action.Name, // Map Action.Name
+		FilterCriteria: workerSent.FilterCriteria,
+		Secrets:        workerSent.Secrets,
+		ProjectKey:     workerSent.ProjectKey,
 	}
 }

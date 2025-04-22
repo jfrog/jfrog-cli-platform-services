@@ -36,6 +36,11 @@ func TestDeployCommand(t *testing.T) {
 			workerKey: "wk-0",
 		}),
 		deployTestSpec(deployTestCase{
+			name:        "create with a version",
+			workerKey:   "wk-0",
+			commandArgs: []string{"--" + model.FlagChangesVersion, "1.0.0", "--" + model.FlagChangesDescription, "Creation of test worker"},
+		}),
+		deployTestSpec(deployTestCase{
 			name:         "deploy scheduled event",
 			workerKey:    "wk-1_1",
 			workerAction: "SCHEDULED_EVENT",
