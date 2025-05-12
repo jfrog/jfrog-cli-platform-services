@@ -44,7 +44,7 @@ func PrintJson(data []byte) error {
 
 func printJsonOrLogError(data []byte) error {
 	if _, writeErr := cliOut.Write(PrettifyJson(data)); writeErr != nil {
-		log.Debug(fmt.Sprintf("Write error: %+v", writeErr))
+		log.Warn(fmt.Sprintf("Write error: %+v (data:%s)", writeErr, string(data)))
 	}
 	return nil
 }
