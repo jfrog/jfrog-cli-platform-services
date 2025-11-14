@@ -56,6 +56,7 @@ const (
 
 var defaultRetryCommandOnErrors = []string{
 	"returned an unexpected status code 502",
+	"connection reset by peer",
 }
 
 var runPlugin = plugins.RunCliWithPlugin(getApp())
