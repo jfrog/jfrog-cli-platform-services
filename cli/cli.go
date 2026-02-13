@@ -1,3 +1,4 @@
+// Package cli provides the CLI entry point for JFrog platform services.
 package cli
 
 import (

@@ -48,15 +48,15 @@ func GetShowExecutionHistoryCommand() components.Command {
 				query["showTestRun"] = "true"
 			}
 
-			return common.CallWorkerApi(c, common.ApiCallParams{
+			return common.CallWorkerAPI(c, common.APICallParams{
 				Method:      http.MethodGet,
-				ServerUrl:   server.GetUrl(),
+				ServerURL:   server.GetUrl(),
 				ServerToken: server.GetAccessToken(),
 				OkStatuses:  []int{http.StatusOK},
 				ProjectKey:  projectKey,
 				Query:       query,
 				Path:        []string{"execution_history"},
-				OnContent:   common.PrintJson,
+				OnContent:   common.PrintJSON,
 			})
 		},
 	}

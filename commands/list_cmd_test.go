@@ -67,7 +67,7 @@ func TestListCommand(t *testing.T) {
 		},
 		{
 			name:        "list for JSON",
-			commandArgs: []string{"--" + model.FlagJsonOutput},
+			commandArgs: []string{"--" + model.FlagJSONOutput},
 			serverStub: common.NewServerStub(t).
 				WithGetAllEndpoint().
 				WithWorkers([]*model.WorkerDetails{
@@ -91,7 +91,7 @@ func TestListCommand(t *testing.T) {
 		},
 		{
 			name:        "projectKey is passed to the request",
-			commandArgs: []string{"--" + model.FlagProjectKey, "my-project", "--" + model.FlagJsonOutput},
+			commandArgs: []string{"--" + model.FlagProjectKey, "my-project", "--" + model.FlagJSONOutput},
 			serverStub:  common.NewServerStub(t).WithProjectKey("my-project").WithGetAllEndpoint(),
 			assert:      common.AssertOutputJson(map[string]any{"workers": []any{}}),
 		},

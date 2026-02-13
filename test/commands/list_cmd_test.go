@@ -83,19 +83,19 @@ func TestListCommand(t *testing.T) {
 		}),
 		listTestSpec(listTestCase{
 			name:         "list worker of type",
-			commandArgs:  []string{"--" + model.FlagJsonOutput, "BEFORE_DOWNLOAD"},
+			commandArgs:  []string{"--" + model.FlagJSONOutput, "BEFORE_DOWNLOAD"},
 			initWorkers:  initialWorkers,
 			assertOutput: assertWorkerListJSON(initialWorkers[2:]...),
 		}),
 		listTestSpec(listTestCase{
 			name:         "list for JSON",
-			commandArgs:  []string{"--" + model.FlagJsonOutput},
+			commandArgs:  []string{"--" + model.FlagJSONOutput},
 			initWorkers:  initialWorkers,
 			assertOutput: assertWorkerListJSON(initialWorkers...),
 		}),
 		listTestSpec(listTestCase{
 			name:         "list with projectKey",
-			commandArgs:  []string{"--" + model.FlagJsonOutput, "--" + model.FlagProjectKey, "my-project"},
+			commandArgs:  []string{"--" + model.FlagJSONOutput, "--" + model.FlagProjectKey, "my-project"},
 			initWorkers:  []*model.WorkerDetails{initialWorkers[0], workerWithProject},
 			assertOutput: assertWorkerListJSON(workerWithProject),
 		}),

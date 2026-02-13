@@ -1,3 +1,4 @@
+// Package commands provides JFrog platform services worker management commands.
 package commands
 
 import (

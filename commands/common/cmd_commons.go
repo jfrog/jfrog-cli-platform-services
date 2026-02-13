@@ -10,7 +10,7 @@ import (
 	"github.com/jfrog/jfrog-cli-platform-services/model"
 )
 
-func PrettifyJson(in []byte) []byte {
+func PrettifyJSON(in []byte) []byte {
 	var out bytes.Buffer
 	if err := json.Indent(&out, in, "", "  "); err != nil {
 		return in

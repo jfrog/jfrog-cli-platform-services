@@ -347,7 +347,7 @@ func (it *Test) Cleanup(f func()) {
 }
 
 func (it *Test) SkipBecause(reason string) {
-	it.t.Skipf(reason)
+	it.t.Skip(reason)
 }
 
 func (it *Test) Helper() {

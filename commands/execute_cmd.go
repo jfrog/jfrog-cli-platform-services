@@ -26,7 +26,7 @@ func GetExecuteCommand() components.Command {
 		},
 		Arguments: []components.Argument{
 			model.GetWorkerKeyArgument(),
-			model.GetJsonPayloadArgument(),
+			model.GetJSONPayloadArgument(),
 		},
 		Action: runExecuteCommand,
 	}
@@ -59,14 +59,14 @@ func runExecuteCommand(c *components.Context) error {
 		return err
 	}
 
-	return common.CallWorkerApi(c, common.ApiCallParams{
+	return common.CallWorkerAPI(c, common.APICallParams{
 		Method:      http.MethodPost,
-		ServerUrl:   server.GetUrl(),
+		ServerURL:   server.GetUrl(),
 		ServerToken: server.GetAccessToken(),
 		OkStatuses:  []int{http.StatusOK},
 		Body:        body,
 		ProjectKey:  projectKey,
 		Path:        []string{"execute", workerKey},
-		OnContent:   common.PrintJson,
+		OnContent:   common.PrintJSON,
 	})
 }

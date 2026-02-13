@@ -94,8 +94,8 @@ func GetDeployCommand() components.Command {
 	}
 }
 
-func runDeployCommand(ctx *components.Context, manifest *model.Manifest, actionMeta *model.ActionMetadata, version *model.Version, serverUrl string, token string) error {
-	existingWorker, err := common.FetchWorkerDetails(ctx, serverUrl, token, manifest.Name, manifest.ProjectKey)
+func runDeployCommand(ctx *components.Context, manifest *model.Manifest, actionMeta *model.ActionMetadata, version *model.Version, serverURL string, token string) error {
+	existingWorker, err := common.FetchWorkerDetails(ctx, serverURL, token, manifest.Name, manifest.ProjectKey)
 	if err != nil {
 		return err
 	}
@@ -112,14 +112,14 @@ func runDeployCommand(ctx *components.Context, manifest *model.Manifest, actionM
 
 	if existingWorker == nil {
 		log.Info(fmt.Sprintf("Deploying worker '%s'", manifest.Name))
-		err = common.CallWorkerApi(ctx, common.ApiCallParams{
+		err = common.CallWorkerAPI(ctx, common.APICallParams{
 			Method:      http.MethodPost,
-			ServerUrl:   serverUrl,
+			ServerURL:   serverURL,
 			ServerToken: token,
 			Body:        bodyBytes,
 			OkStatuses:  []int{http.StatusCreated},
 			Path:        []string{"workers"},
-			ApiVersion:  common.ApiVersionV2,
+			APIVersion:  common.APIVersionV2,
 		})
 		if err == nil {
 			log.Info(fmt.Sprintf("Worker '%s' deployed", manifest.Name))
@@ -128,14 +128,14 @@ func runDeployCommand(ctx *components.Context, manifest *model.Manifest, actionM
 	}
 
 	log.Info(fmt.Sprintf("Updating worker '%s'", manifest.Name))
-	err = common.CallWorkerApi(ctx, common.ApiCallParams{
+	err = common.CallWorkerAPI(ctx, common.APICallParams{
 		Method:      http.MethodPut,
-		ServerUrl:   serverUrl,
+		ServerURL:   serverURL,
 		ServerToken: token,
 		Body:        bodyBytes,
 		OkStatuses:  []int{http.StatusNoContent},
 		Path:        []string{"workers"},
-		ApiVersion:  common.ApiVersionV2,
+		APIVersion:  common.APIVersionV2,
 	})
 	if err == nil {
 		log.Info(fmt.Sprintf("Worker '%s' updated", manifest.Name))

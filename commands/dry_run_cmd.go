@@ -37,7 +37,7 @@ func GetDryRunCommand() components.Command {
 			model.GetNoSecretsFlag(),
 		},
 		Arguments: []components.Argument{
-			model.GetJsonPayloadArgument(),
+			model.GetJSONPayloadArgument(),
 		},
 		Action: func(c *components.Context) error {
 			h := &dryRunHandler{c}
@@ -79,14 +79,14 @@ func GetDryRunCommand() components.Command {
 	}
 }
 
-func (c *dryRunHandler) run(manifest *model.Manifest, serverUrl string, token string, data map[string]any) error {
-	body, err := c.preparePayload(manifest, serverUrl, token, data)
+func (c *dryRunHandler) run(manifest *model.Manifest, serverURL string, token string, data map[string]any) error {
+	body, err := c.preparePayload(manifest, serverURL, token, data)
 	if err != nil {
 		return err
 	}
-	return common.CallWorkerApi(c.ctx, common.ApiCallParams{
+	return common.CallWorkerAPI(c.ctx, common.APICallParams{
 		Method:      http.MethodPost,
-		ServerUrl:   serverUrl,
+		ServerURL:   serverURL,
 		ServerToken: token,
 		Body:        body,
 		ProjectKey:  manifest.ProjectKey,
@@ -95,11 +95,11 @@ func (c *dryRunHandler) run(manifest *model.Manifest, serverUrl string, token st
 		},
 		OkStatuses: []int{http.StatusOK},
 		Path:       []string{"test", manifest.Name},
-		OnContent:  common.PrintJson,
+		OnContent:  common.PrintJSON,
 	})
 }
 
-func (c *dryRunHandler) preparePayload(manifest *model.Manifest, serverUrl string, token string, data map[string]any) ([]byte, error) {
+func (c *dryRunHandler) preparePayload(manifest *model.Manifest, serverURL string, token string, data map[string]any) ([]byte, error) {
 	payload := &dryRunRequest{Action: manifest.Action, Data: data}
 
 	var err error
@@ -110,7 +110,7 @@ func (c *dryRunHandler) preparePayload(manifest *model.Manifest, serverUrl strin
 	}
 	payload.Code = common.CleanImports(payload.Code)
 
-	existingWorker, err := common.FetchWorkerDetails(c.ctx, serverUrl, token, manifest.Name, manifest.ProjectKey)
+	existingWorker, err := common.FetchWorkerDetails(c.ctx, serverURL, token, manifest.Name, manifest.ProjectKey)
 	if err != nil {
 		log.Warn(err.Error())
 	}

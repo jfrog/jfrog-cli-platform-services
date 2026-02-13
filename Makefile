@@ -34,11 +34,11 @@ GOIMPORTS:
 ########## ANALYSE ##########
 
 GOLANGCI_LINT         = ${TOOLS_DIR}/golangci-lint
-GOLANGCI_LINT_VERSION = 1.62.2
+GOLANGCI_LINT_VERSION = 2.9.0
 
 verify: GOLANGCI_LINT
 	echo $(GO_SOURCES)
-	$(GOLANGCI_LINT) run --out-format tab --config "${WORKSPACE_ROOT}/.golangci.yml"
+	$(GOLANGCI_LINT) run --config "${WORKSPACE_ROOT}/.golangci.yml"
 
 GOLANGCI_LINT:
 	${GOLANGCI_LINT} --version 2>/dev/null | grep ${GOLANGCI_LINT_VERSION} || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${TOOLS_DIR} v${GOLANGCI_LINT_VERSION}
@@ -46,7 +46,7 @@ GOLANGCI_LINT:
 ########## BUILD ##########
 prereq::
 	$(GOCMD) install github.com/jstemmer/go-junit-report@v1.0.0
-	GOBIN=${TOOLS_DIR} $(GOCMD) install go.uber.org/mock/mockgen@v0.5.0
+	GOBIN=${TOOLS_DIR} $(GOCMD) install go.uber.org/mock/mockgen@v0.6.0
 
 ########## TEST ##########
 
