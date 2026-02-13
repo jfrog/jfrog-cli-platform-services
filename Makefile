@@ -46,7 +46,7 @@ GOLANGCI_LINT:
 ########## BUILD ##########
 prereq::
 	$(GOCMD) install github.com/jstemmer/go-junit-report@v1.0.0
-	GOBIN=${TOOLS_DIR} $(GOCMD) install go.uber.org/mock/mockgen@v0.5.0
+	GOBIN=${TOOLS_DIR} $(GOCMD) install go.uber.org/mock/mockgen@v0.6.0
 
 ########## TEST ##########
 
