@@ -1,6 +1,6 @@
 module github.com/jfrog/jfrog-cli-platform-services-qa
 
-go 1.25.5
+go 1.25.7
 
 require (
 	github.com/jfrog/jfrog-cli-core/v2 v2.60.0
