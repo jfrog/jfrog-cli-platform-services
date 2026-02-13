@@ -71,7 +71,7 @@ func NewMockWorkerServer(t *testing.T, stubs ...*ServerStub) (*mockhttp.Server, 
 
 	server := mockhttp.StartServer(mockhttp.WithEndpoints(allEndpoints...), mockhttp.WithName("worker"))
 
-	TestSetEnv(t, model.EnvKeyServerUrl, server.BaseUrl())
+	TestSetEnv(t, model.EnvKeyServerURL, server.BaseUrl())
 	TestSetEnv(t, model.EnvKeyAccessToken, token)
 	TestSetEnv(t, model.EnvKeySecretsPassword, SecretPassword)
 

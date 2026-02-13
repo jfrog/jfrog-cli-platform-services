@@ -37,13 +37,13 @@ func Print(message string, args ...any) error {
 	return err
 }
 
-func PrintJson(data []byte) error {
-	_, err := cliOut.Write(PrettifyJson(data))
+func PrintJSON(data []byte) error {
+	_, err := cliOut.Write(PrettifyJSON(data))
 	return err
 }
 
-func printJsonOrLogError(data []byte) error {
-	if _, writeErr := cliOut.Write(PrettifyJson(data)); writeErr != nil {
+func printJSONOrLogError(data []byte) error {
+	if _, writeErr := cliOut.Write(PrettifyJSON(data)); writeErr != nil {
 		log.Warn(fmt.Sprintf("Write error: %+v (data:%s)", writeErr, string(data)))
 	}
 	return nil

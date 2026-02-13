@@ -42,9 +42,9 @@ func runRemoveCommand(c *components.Context) error {
 
 	log.Info(fmt.Sprintf("Removing worker '%s' ...", workerKey))
 
-	err = common.CallWorkerApi(c, common.ApiCallParams{
+	err = common.CallWorkerAPI(c, common.APICallParams{
 		Method:      http.MethodDelete,
-		ServerUrl:   server.GetUrl(),
+		ServerURL:   server.GetUrl(),
 		ServerToken: server.GetAccessToken(),
 		OkStatuses:  []int{http.StatusNoContent},
 		Path:        []string{"workers", workerKey},

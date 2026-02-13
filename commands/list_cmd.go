@@ -25,7 +25,7 @@ func GetListCommand() components.Command {
 		Aliases:     []string{"ls"},
 		Flags: []components.Flag{
 			plugins_common.GetServerIdFlag(),
-			model.GetJsonOutputFlag("Use JSON instead of CSV as output"),
+			model.GetJSONOutputFlag("Use JSON instead of CSV as output"),
 			model.GetTimeoutFlag(),
 			model.GetProjectKeyFlag(),
 		},
@@ -46,7 +46,7 @@ func GetListCommand() components.Command {
 	}
 }
 
-func runListCommand(ctx *components.Context, serverUrl string, token string) error {
+func runListCommand(ctx *components.Context, serverURL string, token string) error {
 	params := make(map[string]string)
 
 	var action string
@@ -59,13 +59,13 @@ func runListCommand(ctx *components.Context, serverUrl string, token string) err
 	}
 
 	contentHandler := printWorkerDetailsAsCsv
-	if ctx.GetBoolFlagValue(model.FlagJsonOutput) {
-		contentHandler = common.PrintJson
+	if ctx.GetBoolFlagValue(model.FlagJSONOutput) {
+		contentHandler = common.PrintJSON
 	}
 
-	return common.CallWorkerApi(ctx, common.ApiCallParams{
+	return common.CallWorkerAPI(ctx, common.APICallParams{
 		Method:      http.MethodGet,
-		ServerUrl:   serverUrl,
+		ServerURL:   serverURL,
 		ServerToken: token,
 		Query:       params,
 		OkStatuses:  []int{http.StatusOK},

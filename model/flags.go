@@ -18,7 +18,7 @@ const (
 	FlagNoTest             = "no-test"
 	FlagEdit               = "edit"
 	FlagNoSecrets          = "no-secrets"
-	FlagJsonOutput         = "json"
+	FlagJSONOutput         = "json"
 	FlagTimeout            = "timeout-ms"
 	FlagProjectKey         = "project-key"
 	FlagApplication        = "application"
@@ -29,7 +29,7 @@ const (
 )
 
 var (
-	EnvKeyServerUrl       = "JFROG_WORKER_CLI_DEV_SERVER_URL"
+	EnvKeyServerURL       = "JFROG_WORKER_CLI_DEV_SERVER_URL"
 	EnvKeyAccessToken     = "JFROG_WORKER_CLI_DEV_ACCESS_TOKEN"
 	EnvKeySecretsPassword = "JFROG_WORKER_CLI_DEV_SECRETS_PASSWORD"
 	EnvKeyAddSecretValue  = "JFROG_WORKER_CLI_DEV_ADD_SECRET_VALUE"
@@ -40,8 +40,8 @@ type IntFlagProvider interface {
 	GetIntFlagValue(name string) (int, error)
 }
 
-func GetJsonOutputFlag(description ...string) components.BoolFlag {
-	f := components.NewBoolFlag(FlagJsonOutput, "Whether to use a json output.", components.WithBoolDefaultValue(false))
+func GetJSONOutputFlag(description ...string) components.BoolFlag {
+	f := components.NewBoolFlag(FlagJSONOutput, "Whether to use a json output.", components.WithBoolDefaultValue(false))
 	if len(description) > 0 && description[0] != "" {
 		f.Description = description[0]
 	}
@@ -80,7 +80,7 @@ func GetWorkerKeyArgument() components.Argument {
 	}
 }
 
-func GetJsonPayloadArgument() components.Argument {
+func GetJSONPayloadArgument() components.Argument {
 	return components.Argument{
 		Name:        "json-payload",
 		Description: "The json payload expected by the worker.\n\t\tUse '-' to read from standard input.\n\t\tUse '@<file-path>' to read from a file located at <file-path>.",
@@ -120,11 +120,11 @@ func GetChangesCommitShaFlag() components.StringFlag {
 }
 
 func GetServerDetails(c *components.Context) (*config.ServerDetails, error) {
-	serverUrlFromEnv, envHasServerUrl := os.LookupEnv(EnvKeyServerUrl)
+	serverURLFromEnv, envHasServerURL := os.LookupEnv(EnvKeyServerURL)
 	accessTokenFromEnv, envHasAccessToken := os.LookupEnv(EnvKeyAccessToken)
 
-	if envHasServerUrl && envHasAccessToken {
-		return &config.ServerDetails{Url: serverUrlFromEnv, AccessToken: accessTokenFromEnv}, nil
+	if envHasServerURL && envHasAccessToken {
+		return &config.ServerDetails{Url: serverURLFromEnv, AccessToken: accessTokenFromEnv}, nil
 	}
 
 	return plugins_common.GetServerDetails(c)

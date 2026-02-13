@@ -1,3 +1,4 @@
+// Package model provides data structures for JFrog platform services.
 package model
 
 type ActionFilterType string
@@ -21,7 +22,7 @@ type ActionMetadata struct {
 	SupportProjects      bool             `json:"supportProjects"`
 	FilterType           ActionFilterType `json:"filterType"`
 	MandatoryFilter      bool             `json:"mandatoryFilter"`
-	WikiUrl              string           `json:"wikiUrl"`
+	WikiURL              string           `json:"wikiUrl"`
 	Async                bool             `json:"async"`
 	ExecutionRequestType string           `json:"executionRequestType"`
 }

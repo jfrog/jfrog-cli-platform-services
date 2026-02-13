@@ -1,3 +1,4 @@
+// Package common provides shared utilities for JFrog platform services commands.
 package common
 
 import (
@@ -19,53 +20,53 @@ import (
 type apiVersion int
 
 const (
-	ApiVersionV1 apiVersion = iota + 1
-	ApiVersionV2 apiVersion = 2
+	APIVersionV1 apiVersion = iota + 1
+	APIVersionV2 apiVersion = 2
 )
 
-type ApiContentHandler func(content []byte) error
+type APIContentHandler func(content []byte) error
 
-type ApiError struct {
+type APIError struct {
 	StatusCode int
 	Message    string
 }
 
-func (e *ApiError) Error() string {
+func (e *APIError) Error() string {
 	return e.Message
 }
 
-func apiError(status int, message string, args ...any) *ApiError {
-	return &ApiError{
+func apiError(status int, message string, args ...any) *APIError {
+	return &APIError{
 		StatusCode: status,
 		Message:    fmt.Sprintf(message, args...),
 	}
 }
 
-type ApiCallParams struct {
+type APICallParams struct {
 	Method      string
-	ServerUrl   string
+	ServerURL   string
 	ServerToken string
 	Body        []byte
 	Query       map[string]string
 	Path        []string
 	ProjectKey  string
-	ApiVersion  apiVersion
+	APIVersion  apiVersion
 	OkStatuses  []int
-	OnContent   ApiContentHandler
+	OnContent   APIContentHandler
 }
 
-func CallWorkerApi(c model.IntFlagProvider, params ApiCallParams) error {
+func CallWorkerAPI(c model.IntFlagProvider, params APICallParams) error {
 	timeout, err := model.GetTimeoutParameter(c)
 	if err != nil {
 		return apiError(http.StatusInternalServerError, "%+v", err)
 	}
 
-	apiVersion := ApiVersionV1
-	if params.ApiVersion != 0 {
-		apiVersion = params.ApiVersion
+	apiVersion := APIVersionV1
+	if params.APIVersion != 0 {
+		apiVersion = params.APIVersion
 	}
 
-	apiEndpoint := fmt.Sprintf("%sworker/api/v%d/%s", utils.AddTrailingSlashIfNeeded(params.ServerUrl), apiVersion, strings.Join(params.Path, "/"))
+	apiEndpoint := fmt.Sprintf("%sworker/api/v%d/%s", utils.AddTrailingSlashIfNeeded(params.ServerURL), apiVersion, strings.Join(params.Path, "/"))
 
 	q := url.Values{}
 
@@ -108,14 +109,14 @@ func CallWorkerApi(c model.IntFlagProvider, params ApiCallParams) error {
 
 	if slices.Index(params.OkStatuses, res.StatusCode) == -1 {
 		// We the response contains json content, we will print it
-		_ = processApiResponse(res, printJsonOrLogError)
+		_ = processAPIResponse(res, printJSONOrLogError)
 		return apiError(res.StatusCode, "command %s %s returned an unexpected status code %d", params.Method, apiEndpoint, res.StatusCode)
 	}
 
-	return processApiResponse(res, params.OnContent)
+	return processAPIResponse(res, params.OnContent)
 }
 
-func processApiResponse(res *http.Response, doWithContent func(content []byte) error) error {
+func processAPIResponse(res *http.Response, doWithContent func(content []byte) error) error {
 	var err error
 	var responseBytes []byte
 

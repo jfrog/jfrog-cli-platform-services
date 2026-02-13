@@ -14,18 +14,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCallWorkerApi(t *testing.T) {
+func TestCallWorkerAPI(t *testing.T) {
 	tests := []struct {
 		name    string
 		stub    *ServerStub
-		params  ApiCallParams
+		params  APICallParams
 		ctx     model.IntFlagProvider
 		wantErr string
 	}{
 		{
 			name: "success",
 			stub: NewServerStub(t).WithGetAllEndpoint(),
-			params: ApiCallParams{
+			params: APICallParams{
 				Method:     "GET",
 				Path:       []string{"workers"},
 				OkStatuses: []int{http.StatusOK},
@@ -34,7 +34,7 @@ func TestCallWorkerApi(t *testing.T) {
 		{
 			name: "unexpected status",
 			stub: NewServerStub(t).WithGetAllEndpoint(),
-			params: ApiCallParams{
+			params: APICallParams{
 				Method:     "GET",
 				Path:       []string{"workers"},
 				OkStatuses: []int{http.StatusNoContent},
@@ -44,7 +44,7 @@ func TestCallWorkerApi(t *testing.T) {
 		{
 			name: "cancel on timeout",
 			stub: NewServerStub(t).WithDelay(time.Second).WithGetAllEndpoint(),
-			params: ApiCallParams{
+			params: APICallParams{
 				Method:     "GET",
 				Path:       []string{"workers"},
 				OkStatuses: []int{http.StatusNoContent},
@@ -58,7 +58,7 @@ func TestCallWorkerApi(t *testing.T) {
 				WithGetAllEndpoint().
 				WithQueryParam("a", "1").
 				WithQueryParam("b", "2"),
-			params: ApiCallParams{
+			params: APICallParams{
 				Method:     "GET",
 				Path:       []string{"workers"},
 				OkStatuses: []int{http.StatusOK},
@@ -70,7 +70,7 @@ func TestCallWorkerApi(t *testing.T) {
 			stub: NewServerStub(t).
 				WithGetAllEndpoint().
 				WithProjectKey("projectKey"),
-			params: ApiCallParams{
+			params: APICallParams{
 				Method:     "GET",
 				Path:       []string{"workers"},
 				OkStatuses: []int{http.StatusOK},
@@ -83,7 +83,7 @@ func TestCallWorkerApi(t *testing.T) {
 				WithGetAllEndpoint().
 				WithQueryParam("a", "1").
 				WithProjectKey("projectKey"),
-			params: ApiCallParams{
+			params: APICallParams{
 				Method:     "GET",
 				Path:       []string{"workers"},
 				OkStatuses: []int{http.StatusOK},
@@ -94,7 +94,7 @@ func TestCallWorkerApi(t *testing.T) {
 		{
 			name: "process response",
 			stub: NewServerStub(t).WithGetAllEndpoint().WithWorkers(&model.WorkerDetails{Key: "wk-0"}),
-			params: ApiCallParams{
+			params: APICallParams{
 				Method:     "GET",
 				Path:       []string{"workers"},
 				OkStatuses: []int{http.StatusOK},
@@ -120,7 +120,7 @@ func TestCallWorkerApi(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			s, token := NewMockWorkerServer(t, tt.stub.WithT(t))
 
-			tt.params.ServerUrl = s.BaseUrl()
+			tt.params.ServerURL = s.BaseUrl()
 			tt.params.ServerToken = token
 
 			ctx := tt.ctx
@@ -128,7 +128,7 @@ func TestCallWorkerApi(t *testing.T) {
 				ctx = IntFlagMap{}
 			}
 
-			err := CallWorkerApi(ctx, tt.params)
+			err := CallWorkerAPI(ctx, tt.params)
 			if tt.wantErr == "" {
 				assert.NoError(t, err)
 			} else {
