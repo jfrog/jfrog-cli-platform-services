@@ -3,6 +3,7 @@
 package infra
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -138,6 +139,21 @@ func (h *HttpExecutor) DoAndCaptureError() (*HttpResponse, error) {
 }
 
 func (h *HttpExecutor) doWithRetries() (*HttpResponse, error) {
+	var bodyBytes []byte
+	if h.request.Body != nil {
+		var err error
+		bodyBytes, err = io.ReadAll(h.request.Body)
+		_ = h.request.Body.Close()
+		if err != nil {
+			return nil, err
+		}
+		h.request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+		h.request.ContentLength = int64(len(bodyBytes))
+		h.request.GetBody = func() (io.ReadCloser, error) {
+			return io.NopCloser(bytes.NewReader(bodyBytes)), nil
+		}
+	}
+
 	start := time.Now()
 
 	resp, err := http.DefaultClient.Do(h.request)
@@ -150,6 +166,9 @@ func (h *HttpExecutor) doWithRetries() (*HttpResponse, error) {
 
 	for slices.Index(h.retryOnStatuses, resp.StatusCode) > -1 && elapsed < h.retryTimeout {
 		time.Sleep(backoff)
+		if bodyBytes != nil {
+			h.request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+		}
 		resp, err = http.DefaultClient.Do(h.request)
 		if err != nil {
 			return nil, err

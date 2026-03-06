@@ -109,10 +109,18 @@ func executeSpec(tc executeTestCase) infra.TestDefinition {
 		Skip:          tc.skip,
 		CaptureOutput: true,
 		Test: func(it *infra.Test) {
+			suffix := infra.UniqueID()
+
 			workerDir, workerName := it.PrepareWorkerTestDir()
 
 			if tc.workerKey != "" {
-				workerName = tc.workerKey
+				uniqueKey := tc.workerKey + "-" + suffix
+				for i, arg := range tc.commandArgs {
+					if arg == tc.workerKey {
+						tc.commandArgs[i] = uniqueKey
+					}
+				}
+				workerName = uniqueKey
 			}
 
 			action := "GENERIC_EVENT"

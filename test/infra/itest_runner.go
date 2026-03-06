@@ -49,9 +49,9 @@ type Test struct {
 }
 
 const (
-	requestTimeout      = 5 * time.Second
+	requestTimeout      = 15 * time.Second
 	defaultRetryBackoff = 250 * time.Millisecond
-	defaultRetryTimeout = 2 * time.Second
+	defaultRetryTimeout = 10 * time.Second
 )
 
 var defaultRetryCommandOnErrors = []string{
@@ -357,6 +357,10 @@ func (it *Test) Run(name string, f func(t *Test)) bool {
 	return it.t.Run(name, func(t *testing.T) {
 		f(&Test{t: t, ServerId: it.ServerId, AccessToken: it.AccessToken, dataDir: it.dataDir, stdout: it.stdout, stdin: it.stdin, input: it.input})
 	})
+}
+
+func UniqueID() string {
+	return uuid.NewString()[:8]
 }
 
 func (it *Test) NewHttpRequest() *HttpRequest {

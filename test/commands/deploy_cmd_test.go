@@ -93,7 +93,10 @@ func deployTestSpec(tc deployTestCase) infra.TestDefinition {
 		Only: tc.only,
 		Skip: tc.skip,
 		Test: func(it *infra.Test) {
+			suffix := infra.UniqueID()
+
 			for _, initialWorker := range tc.initWorkers {
+				initialWorker.Key = initialWorker.Key + "-" + suffix
 				it.CreateWorker(initialWorker)
 				it.Cleanup(func() {
 					it.DeleteWorker(initialWorker.Key)
@@ -102,7 +105,7 @@ func deployTestSpec(tc deployTestCase) infra.TestDefinition {
 
 			_, workerName := it.PrepareWorkerTestDir()
 			if tc.workerKey != "" {
-				workerName = tc.workerKey
+				workerName = tc.workerKey + "-" + suffix
 			}
 
 			workerAction := tc.workerAction
@@ -147,7 +150,7 @@ func deployTestSpec(tc deployTestCase) infra.TestDefinition {
 }
 
 func assertWorkerDeployed(it *infra.Test, mf *model.Manifest) {
-	ctx, cancelCtx := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancelCtx := context.WithTimeout(context.Background(), 15*time.Second)
 	it.Cleanup(cancelCtx)
 
 	deployed := model.WorkerDetails{}
