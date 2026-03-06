@@ -51,9 +51,17 @@ func removeTestSpec(tc removeTestCase) infra.TestDefinition {
 		Only: tc.only,
 		Skip: tc.skip,
 		Test: func(it *infra.Test) {
+			suffix := infra.UniqueID()
+
 			_, workerName := it.PrepareWorkerTestDir()
 			if tc.workerKey != "" {
-				workerName = tc.workerKey
+				uniqueKey := tc.workerKey + "-" + suffix
+				for i, arg := range tc.commandArgs {
+					if arg == tc.workerKey {
+						tc.commandArgs[i] = uniqueKey
+					}
+				}
+				workerName = uniqueKey
 			}
 
 			err := it.RunCommand(infra.AppName, "init", "GENERIC_EVENT", workerName)
@@ -86,7 +94,7 @@ func removeTestSpec(tc removeTestCase) infra.TestDefinition {
 }
 
 func assertWorkerRemoved(it *infra.Test, mf *model.Manifest) {
-	ctx, cancelCtx := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancelCtx := context.WithTimeout(context.Background(), 15*time.Second)
 	it.Cleanup(cancelCtx)
 
 	it.NewHttpRequestWithContext(ctx).

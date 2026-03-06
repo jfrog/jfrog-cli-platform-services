@@ -11,7 +11,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 
@@ -32,23 +31,25 @@ type listTestCase struct {
 }
 
 func TestListCommand(t *testing.T) {
+	id := infra.UniqueID()
+
 	initialWorkers := []*model.WorkerDetails{
 		{
-			Key:         fmt.Sprintf("w%v", time.Now().Unix()),
+			Key:         "w0-" + id,
 			Description: "My worker 0",
 			Enabled:     true,
 			SourceCode:  `export default async function() { return { "status": "OK" } }`,
 			Action:      "GENERIC_EVENT",
 		},
 		{
-			Key:         fmt.Sprintf("w%v", time.Now().Unix()+1),
+			Key:         "w1-" + id,
 			Description: "My worker 1",
 			Enabled:     true,
 			SourceCode:  `export default async function() { return { "status": "OK" } }`,
 			Action:      "GENERIC_EVENT",
 		},
 		{
-			Key:         fmt.Sprintf("w%v", time.Now().Unix()+2),
+			Key:         "w2-" + id,
 			Description: "My worker 2",
 			Enabled:     true,
 			SourceCode:  `export default async function() { return { "status": "OK" } }`,
@@ -62,7 +63,7 @@ func TestListCommand(t *testing.T) {
 	}
 
 	workerWithProject := &model.WorkerDetails{
-		Key:         fmt.Sprintf("w%v", time.Now().Unix()+3),
+		Key:         "w3-" + id,
 		Description: "My worker 3",
 		Enabled:     true,
 		Debug:       true,

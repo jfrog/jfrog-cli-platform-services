@@ -4,7 +4,6 @@ package infra
 
 import (
 	"context"
-	"time"
 
 	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 
@@ -17,7 +16,7 @@ func AddSecretPasswordToEnv(t common.Test) {
 }
 
 func AssertSecretValueFromServer(it *Test, workerKey string, secretKey string, wantValue string) {
-	ctx, cancelCtx := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancelCtx := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancelCtx()
 
 	check := struct {
