@@ -8,5 +8,6 @@
   "minArtifactoryVersionForProjectSupport": "7.95.0",
   "isTutorialAvailable": false,
   "isFeedbackEnabled": false,
-  "isHistoryEnabled": true
+  "isHistoryEnabled": true,
+  "shouldEncodeSourceCodeInBase64": false
 }

@@ -13,4 +13,5 @@ type OptionsMetadata struct {
 	IsTutorialAvailable                    bool           `json:"isTutorialAvailable"`
 	IsFeedbackEnabled                      bool           `json:"isFeedbackEnabled"`
 	IsHistoryEnabled                       bool           `json:"isHistoryEnabled"`
+	ShouldEncodeSourceCodeInBase64         *bool          `json:"shouldEncodeSourceCodeInBase64"`
 }
