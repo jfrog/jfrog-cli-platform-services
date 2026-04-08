@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -39,6 +40,7 @@ func GetDeployCommand() components.Command {
 			model.GetChangesVersionFlag(),
 			model.GetChangesDescriptionFlag(),
 			model.GetChangesCommitShaFlag(),
+			model.GetBase64Flag(),
 		},
 		Action: func(c *components.Context) error {
 			server, err := model.GetServerDetails(c)
@@ -80,27 +82,30 @@ func GetDeployCommand() components.Command {
 				Description: c.GetStringFlagValue(model.FlagChangesDescription),
 				CommitSha:   c.GetStringFlagValue(model.FlagChangesCommitSha),
 			}
+
+			options, err := common.FetchOptions(c, server.GetUrl(), server.GetAccessToken())
+			if err != nil {
+				return err
+			}
+
 			if !version.IsEmpty() {
-				options, err := common.FetchOptions(c, server.GetUrl(), server.GetAccessToken())
-				if err != nil {
-					return err
-				}
 				if err = common.ValidateVersion(version, options); err != nil {
 					return err
 				}
 			}
-			return runDeployCommand(c, manifest, actionMeta, version, server.GetUrl(), server.GetAccessToken())
+
+			return runDeployCommand(c, manifest, actionMeta, version, server.GetUrl(), server.GetAccessToken(), options.ShouldEncodeSourceCodeInBase64)
 		},
 	}
 }
 
-func runDeployCommand(ctx *components.Context, manifest *model.Manifest, actionMeta *model.ActionMetadata, version *model.Version, serverURL string, token string) error {
+func runDeployCommand(ctx *components.Context, manifest *model.Manifest, actionMeta *model.ActionMetadata, version *model.Version, serverURL string, token string, forceBase64 bool) error {
 	existingWorker, err := common.FetchWorkerDetails(ctx, serverURL, token, manifest.Name, manifest.ProjectKey)
 	if err != nil {
 		return err
 	}
 
-	body, err := prepareDeployRequest(ctx, manifest, actionMeta, version, existingWorker)
+	body, err := prepareDeployRequest(ctx, manifest, actionMeta, version, existingWorker, forceBase64)
 	if err != nil {
 		return err
 	}
@@ -144,12 +149,16 @@ func runDeployCommand(ctx *components.Context, manifest *model.Manifest, actionM
 	return err
 }
 
-func prepareDeployRequest(ctx *components.Context, manifest *model.Manifest, actionMeta *model.ActionMetadata, version *model.Version, existingWorker *model.WorkerDetails) (*deployRequest, error) {
+func prepareDeployRequest(ctx *components.Context, manifest *model.Manifest, actionMeta *model.ActionMetadata, version *model.Version, existingWorker *model.WorkerDetails, forceBase64 bool) (*deployRequest, error) {
 	sourceCode, err := common.ReadSourceCode(manifest)
 	if err != nil {
 		return nil, err
 	}
 	sourceCode = common.CleanImports(sourceCode)
+
+	if forceBase64 || ctx.GetBoolFlagValue(model.FlagBase64) {
+		sourceCode = "base64:" + base64.StdEncoding.EncodeToString([]byte(sourceCode))
+	}
 
 	var secrets []*model.Secret
 

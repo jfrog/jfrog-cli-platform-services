@@ -4,6 +4,7 @@
 package commands
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -37,6 +38,7 @@ func TestDeployCommand(t *testing.T) {
 			workerName:   "wk-0",
 			serverBehavior: common.NewServerStub(t).
 				WithGetOneEndpoint().
+				WithOptionsEndpoint().
 				WithCreateEndpoint(
 					expectDeployRequest(
 						actionsMeta,
@@ -60,6 +62,7 @@ func TestDeployCommand(t *testing.T) {
 			workerName:   "wk-1",
 			serverBehavior: common.NewServerStub(t).
 				WithGetOneEndpoint().
+				WithOptionsEndpoint().
 				WithUpdateEndpoint(
 					expectDeployRequest(actionsMeta, "wk-1", "GENERIC_EVENT", ""),
 				).
@@ -73,6 +76,7 @@ func TestDeployCommand(t *testing.T) {
 			workerName:   "wk-2",
 			serverBehavior: common.NewServerStub(t).
 				WithGetOneEndpoint().
+				WithOptionsEndpoint().
 				WithUpdateEndpoint(
 					expectDeployRequest(
 						actionsMeta,
@@ -102,6 +106,7 @@ func TestDeployCommand(t *testing.T) {
 			workerName:   "wk-1",
 			serverBehavior: common.NewServerStub(t).
 				WithGetOneEndpoint().
+				WithOptionsEndpoint().
 				WithCreateEndpoint(
 					expectDeployRequest(actionsMeta, "wk-1", "GENERIC_EVENT", "proj-1"),
 				),
@@ -113,7 +118,7 @@ func TestDeployCommand(t *testing.T) {
 			name:           "should validate schedule",
 			workerAction:   "SCHEDULED_EVENT",
 			workerName:     "wk-3",
-			serverBehavior: common.NewServerStub(t).WithGetOneEndpoint(),
+			serverBehavior: common.NewServerStub(t).WithGetOneEndpoint().WithOptionsEndpoint(),
 			patchManifest: func(mf *model.Manifest) {
 				mf.FilterCriteria = &model.FilterCriteria{
 					Schedule: &model.ScheduleFilterCriteria{
@@ -129,6 +134,7 @@ func TestDeployCommand(t *testing.T) {
 			commandArgs: []string{"--" + model.FlagTimeout, "500"},
 			serverBehavior: common.NewServerStub(t).
 				WithDelay(1 * time.Second).
+				WithOptionsEndpoint().
 				WithCreateEndpoint(nil),
 			wantErr: errors.New("request timed out after 500ms"),
 		},
@@ -154,6 +160,58 @@ func TestDeployCommand(t *testing.T) {
 					),
 				),
 			commandArgs: []string{"--" + model.FlagChangesVersion, "version number", "--" + model.FlagChangesDescription, "version description", "--" + model.FlagChangesCommitSha, "version commitsha"},
+		},
+		{
+			name:         "create with base64 encoding",
+			workerAction: "BEFORE_UPLOAD",
+			workerName:   "wk-0",
+			commandArgs:  []string{"--" + model.FlagBase64},
+			serverBehavior: common.NewServerStub(t).
+				WithGetOneEndpoint().
+				WithOptionsEndpoint().
+				WithCreateEndpoint(
+					expectDeployRequestBase64(actionsMeta, "wk-0", "BEFORE_UPLOAD", ""),
+				),
+		},
+		{
+			name:         "update with base64 encoding",
+			workerAction: "GENERIC_EVENT",
+			workerName:   "wk-1",
+			commandArgs:  []string{"--" + model.FlagBase64},
+			serverBehavior: common.NewServerStub(t).
+				WithGetOneEndpoint().
+				WithOptionsEndpoint().
+				WithUpdateEndpoint(
+					expectDeployRequestBase64(actionsMeta, "wk-1", "GENERIC_EVENT", ""),
+				).
+				WithWorkers(&model.WorkerDetails{
+					Key: "wk-1",
+				}),
+		},
+		{
+			name:         "create with base64 from options",
+			workerAction: "BEFORE_UPLOAD",
+			workerName:   "wk-0",
+			serverBehavior: common.NewServerStub(t).
+				WithGetOneEndpoint().
+				WithBase64OptionsEndpoint().
+				WithCreateEndpoint(
+					expectDeployRequestBase64(actionsMeta, "wk-0", "BEFORE_UPLOAD", ""),
+				),
+		},
+		{
+			name:         "update with base64 from options",
+			workerAction: "GENERIC_EVENT",
+			workerName:   "wk-1",
+			serverBehavior: common.NewServerStub(t).
+				WithGetOneEndpoint().
+				WithBase64OptionsEndpoint().
+				WithUpdateEndpoint(
+					expectDeployRequestBase64(actionsMeta, "wk-1", "GENERIC_EVENT", ""),
+				).
+				WithWorkers(&model.WorkerDetails{
+					Key: "wk-1",
+				}),
 		},
 		{
 			name: "fails when version invalid",
@@ -232,6 +290,17 @@ func assertDeployRequestEquals(t require.TestingT, want, got *deployRequest) {
 func expectDeployRequest(actionsMeta common.ActionsMetadata, workerName, actionName, projectKey string, secrets ...*model.Secret) common.BodyValidator {
 	return func(t require.TestingT, body []byte) {
 		want := getExpectedDeployRequestForAction(t, actionsMeta, workerName, actionName, projectKey, secrets...)
+		got := &deployRequest{}
+		err := json.Unmarshal(body, got)
+		require.NoError(t, err)
+		assertDeployRequestEquals(t, want, got)
+	}
+}
+
+func expectDeployRequestBase64(actionsMeta common.ActionsMetadata, workerName, actionName, projectKey string, secrets ...*model.Secret) common.BodyValidator {
+	return func(t require.TestingT, body []byte) {
+		want := getExpectedDeployRequestForAction(t, actionsMeta, workerName, actionName, projectKey, secrets...)
+		want.SourceCode = "base64:" + base64.StdEncoding.EncodeToString([]byte(want.SourceCode))
 		got := &deployRequest{}
 		err := json.Unmarshal(body, got)
 		require.NoError(t, err)

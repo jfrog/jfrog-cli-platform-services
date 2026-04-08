@@ -25,6 +25,7 @@ const (
 	FlagChangesVersion     = "changes-version"
 	FlagChangesDescription = "changes-description"
 	FlagChangesCommitSha   = "changes-commitsha"
+	FlagBase64             = "base64"
 	defaultTimeoutMillis   = 5000
 )
 
@@ -117,6 +118,10 @@ func GetChangesDescriptionFlag() components.StringFlag {
 
 func GetChangesCommitShaFlag() components.StringFlag {
 	return components.NewStringFlag(FlagChangesCommitSha, "Commit identifier or your change in your VCS.", components.WithStrDefaultValue(""))
+}
+
+func GetBase64Flag() components.BoolFlag {
+	return components.NewBoolFlag(FlagBase64, "Encode the worker source code in base64 before sending.", components.WithBoolDefaultValue(false))
 }
 
 func GetServerDetails(c *components.Context) (*config.ServerDetails, error) {
