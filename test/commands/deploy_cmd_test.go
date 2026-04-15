@@ -5,6 +5,7 @@ package commands
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -25,6 +26,7 @@ type deployTestCase struct {
 	workerKey     string
 	workerAction  string
 	commandArgs   []string
+	timeout       time.Duration
 	initWorkers   []*model.WorkerDetails
 	patchManifest func(mf *model.Manifest)
 }
@@ -34,20 +36,24 @@ func TestDeployCommand(t *testing.T) {
 		deployTestSpec(deployTestCase{
 			name:      "create",
 			workerKey: "wk-0",
+			timeout:   10 * time.Second,
 		}),
 		deployTestSpec(deployTestCase{
 			name:        "create with a version",
 			workerKey:   "wk-0",
 			commandArgs: []string{"--" + model.FlagChangesVersion, "1.0.0", "--" + model.FlagChangesDescription, "Creation of test worker"},
+			timeout:     10 * time.Second,
 		}),
 		deployTestSpec(deployTestCase{
 			name:         "deploy scheduled event",
 			workerKey:    "wk-1_1",
 			workerAction: "SCHEDULED_EVENT",
+			timeout:      10 * time.Second,
 		}),
 		deployTestSpec(deployTestCase{
 			name:      "update",
 			workerKey: "wk-1",
+			timeout:   10 * time.Second,
 			initWorkers: []*model.WorkerDetails{
 				{
 					Key:         "wk-1",
@@ -61,6 +67,7 @@ func TestDeployCommand(t *testing.T) {
 		deployTestSpec(deployTestCase{
 			name:      "update with secrets",
 			workerKey: "wk-3",
+			timeout:   10 * time.Second,
 			initWorkers: []*model.WorkerDetails{
 				{
 					Key:         "wk-3",
@@ -123,6 +130,10 @@ func deployTestSpec(tc deployTestCase) infra.TestDefinition {
 			infra.AddSecretPasswordToEnv(it)
 
 			cmd := append([]string{infra.AppName, "deploy"}, tc.commandArgs...)
+
+			if tc.timeout > 0 {
+				cmd = append(cmd, "--"+model.FlagTimeout, fmt.Sprintf("%d", tc.timeout.Milliseconds()))
+			}
 
 			err = it.RunCommand(cmd...)
 
