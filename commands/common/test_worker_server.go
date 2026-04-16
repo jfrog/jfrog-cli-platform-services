@@ -109,14 +109,15 @@ func NewServerStub(t *testing.T) *ServerStub {
 }
 
 type ServerStub struct {
-	test             *testing.T
-	waitFor          time.Duration
-	token            string
-	projectKey       *queryParamStub
-	workers          map[string]*model.WorkerDetails
-	executionHistory map[string]ExecutionHistoryStub
-	endpoints        []mockhttp.ServerEndpoint
-	queryParams      map[string]queryParamStub
+	test                   *testing.T
+	waitFor                time.Duration
+	token                  string
+	projectKey             *queryParamStub
+	workers                map[string]*model.WorkerDetails
+	executionHistory       map[string]ExecutionHistoryStub
+	endpoints              []mockhttp.ServerEndpoint
+	queryParams            map[string]queryParamStub
+	optionsForceBase64     bool
 }
 
 func (s *ServerStub) WithT(t *testing.T) *ServerStub {
@@ -291,6 +292,11 @@ func (s *ServerStub) WithOptionsEndpoint() *ServerStub {
 			HandleWith(s.handleGetOptions),
 	)
 	return s
+}
+
+func (s *ServerStub) WithBase64OptionsEndpoint() *ServerStub {
+	s.optionsForceBase64 = true
+	return s.WithOptionsEndpoint()
 }
 
 func (s *ServerStub) handleGetAll(res http.ResponseWriter, req *http.Request) {
@@ -492,6 +498,9 @@ func (s *ServerStub) handleGetOptions(res http.ResponseWriter, req *http.Request
 	res.WriteHeader(http.StatusOK)
 
 	options := LoadSampleOptions(s.test)
+	if s.optionsForceBase64 {
+		options.ShouldEncodeSourceCodeInBase64 = true
+	}
 	_, err := res.Write([]byte(MustJsonMarshal(s.test, options)))
 	require.NoError(s.test, err)
 }
