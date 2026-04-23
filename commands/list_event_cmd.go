@@ -1,13 +1,14 @@
 package commands
 
 import (
+	"fmt"
 	"strings"
 
-	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
-
+	"github.com/jfrog/jfrog-cli-core/v2/common/format"
 	plugins_common "github.com/jfrog/jfrog-cli-core/v2/plugins/common"
 	"github.com/jfrog/jfrog-cli-core/v2/plugins/components"
 
+	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 	"github.com/jfrog/jfrog-cli-platform-services/model"
 )
 
@@ -18,6 +19,7 @@ func GetListEventsCommand() components.Command {
 		Aliases:     []string{"le"},
 		Flags: []components.Flag{
 			plugins_common.GetServerIdFlag(),
+			format.GetFormatFlag(format.Table, format.Json, format.Table),
 			model.GetTimeoutFlag(),
 			model.GetProjectKeyFlag(),
 		},
@@ -34,12 +36,23 @@ func GetListEventsCommand() components.Command {
 				return err
 			}
 
-			var actions []string
-			for _, md := range actionsMeta {
-				actions = append(actions, md.Action.Name)
+			outputFormat, err := plugins_common.GetOutputFormat(c)
+			if err != nil {
+				return err
 			}
 
-			return common.Print("%s", strings.Join(actions, ", "))
+			switch outputFormat {
+			case format.Json:
+				return common.PrintJSONValue(actionsMeta)
+			case format.Table:
+				return printListEventTable(actionsMeta)
+			default:
+				return fmt.Errorf("unsupported format '%s'. Accepted values: json, table", outputFormat)
+			}
 		},
 	}
+}
+
+func printListEventTable(actionsMeta common.ActionsMetadata) error {
+	return common.Print("%s", strings.Join(actionsMeta.ActionsNames(), ", "))
 }
