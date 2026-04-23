@@ -186,13 +186,17 @@ func TestWorkerList_FormatUnsupported(t *testing.T) {
 	assert.Contains(t, err.Error(), "unsupported format")
 }
 
-func TestWorkerList_LegacyJSONFlagRemoved(t *testing.T) {
+func TestWorkerList_LegacyJSONFlagDeprecated(t *testing.T) {
 	serverStub := common.NewServerStub(t).WithGetAllEndpoint()
 	common.NewMockWorkerServer(t, serverStub.WithDefaultActionsMetadataEndpoint())
 
+	var out bytes.Buffer
+	common.SetCliOut(&out)
+	t.Cleanup(func() { common.SetCliOut(os.Stdout) })
+
 	runCmd := common.CreateCliRunner(t, GetListCommand())
-	err := runCmd("worker", "list", "--"+model.FlagJSONOutput)
-	require.Error(t, err)
+	require.NoError(t, runCmd("worker", "list", "--"+model.FlagJSONOutput))
+	assert.True(t, json.Valid(out.Bytes()), "expected valid JSON output, got: %s", out.String())
 }
 
 func assertWorkerListOutput(want []*model.WorkerDetails) common.AssertOutputFunc {
