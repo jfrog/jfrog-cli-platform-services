@@ -126,16 +126,33 @@ func runDeployCommand(ctx *components.Context, manifest *model.Manifest, actionM
 		return err
 	}
 
+	var responseStatus int
+	var contentHandler common.APIContentHandler
+	if slices.Contains(ctx.FlagsUsed, format.FlagName) {
+		outputFormat, fmtErr := plugins_common.GetOutputFormat(ctx)
+		if fmtErr != nil {
+			return fmtErr
+		}
+		if outputFormat != format.Json {
+			return fmt.Errorf("unsupported format '%s' for worker deploy. Only json is supported", outputFormat)
+		}
+		contentHandler = func(body []byte) error {
+			return common.PrintJSONOrStatus(responseStatus, body)
+		}
+	}
+
 	if existingWorker == nil {
 		log.Info(fmt.Sprintf("Deploying worker '%s'", manifest.Name))
 		err = common.CallWorkerAPI(ctx, common.APICallParams{
-			Method:      http.MethodPost,
-			ServerURL:   serverURL,
-			ServerToken: token,
-			Body:        bodyBytes,
-			OkStatuses:  []int{http.StatusCreated},
-			Path:        []string{"workers"},
-			APIVersion:  common.APIVersionV2,
+			Method:        http.MethodPost,
+			ServerURL:     serverURL,
+			ServerToken:   token,
+			Body:          bodyBytes,
+			OkStatuses:    []int{http.StatusCreated},
+			Path:          []string{"workers"},
+			APIVersion:    common.APIVersionV2,
+			OnContent:     contentHandler,
+			CaptureStatus: &responseStatus,
 		})
 		if err == nil {
 			log.Info(fmt.Sprintf("Worker '%s' deployed", manifest.Name))
@@ -143,37 +160,22 @@ func runDeployCommand(ctx *components.Context, manifest *model.Manifest, actionM
 	} else {
 		log.Info(fmt.Sprintf("Updating worker '%s'", manifest.Name))
 		err = common.CallWorkerAPI(ctx, common.APICallParams{
-			Method:      http.MethodPut,
-			ServerURL:   serverURL,
-			ServerToken: token,
-			Body:        bodyBytes,
-			OkStatuses:  []int{http.StatusNoContent},
-			Path:        []string{"workers"},
-			APIVersion:  common.APIVersionV2,
+			Method:        http.MethodPut,
+			ServerURL:     serverURL,
+			ServerToken:   token,
+			Body:          bodyBytes,
+			OkStatuses:    []int{http.StatusNoContent},
+			Path:          []string{"workers"},
+			APIVersion:    common.APIVersionV2,
+			OnContent:     contentHandler,
+			CaptureStatus: &responseStatus,
 		})
 		if err == nil {
 			log.Info(fmt.Sprintf("Worker '%s' updated", manifest.Name))
 		}
 	}
 
-	if err != nil {
-		return err
-	}
-
-	if slices.Contains(ctx.FlagsUsed, format.FlagName) {
-		outputFormat, fmtErr := plugins_common.GetOutputFormat(ctx)
-		if fmtErr != nil {
-			return fmtErr
-		}
-		switch outputFormat {
-		case format.Json:
-			return common.PrintJSONValue(map[string]any{"status_code": 200, "message": "OK"})
-		default:
-			return fmt.Errorf("unsupported format '%s' for worker deploy. Only json is supported", outputFormat)
-		}
-	}
-
-	return nil
+	return err
 }
 
 func prepareDeployRequest(ctx *components.Context, manifest *model.Manifest, actionMeta *model.ActionMetadata, version *model.Version, existingWorker *model.WorkerDetails, encodeSourceCodeInBase64 bool) (*deployRequest, error) {

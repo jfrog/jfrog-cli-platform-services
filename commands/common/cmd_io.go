@@ -53,6 +53,21 @@ func PrintJSONValue(v any) error {
 	return err
 }
 
+// PrintJSONOrStatus prints contentBytes as JSON when it is valid JSON,
+// otherwise prints {"status_code": statusCode, "content": "<contentBytes>"}.
+func PrintJSONOrStatus(statusCode int, contentBytes []byte) error {
+	if len(contentBytes) > 0 && json.Valid(contentBytes) {
+		return PrintJSON(contentBytes)
+	}
+	return PrintJSONValue(struct {
+		StatusCode int    `json:"status_code"`
+		Content    string `json:"content"`
+	}{
+		StatusCode: statusCode,
+		Content:    string(contentBytes),
+	})
+}
+
 func printJSONOrLogError(data []byte) error {
 	if _, writeErr := cliOut.Write(PrettifyJSON(data)); writeErr != nil {
 		log.Warn(fmt.Sprintf("Write error: %+v (data:%s)", writeErr, string(data)))
