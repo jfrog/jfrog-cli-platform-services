@@ -5,13 +5,17 @@ package commands
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/jfrog/jfrog-cli-core/v2/common/format"
 	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
-
 	"github.com/jfrog/jfrog-cli-platform-services/model"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestExecutionHistory(t *testing.T) {
@@ -152,4 +156,81 @@ func TestExecutionHistory(t *testing.T) {
 			tt.assert(t, output.Bytes(), err)
 		})
 	}
+}
+
+func testExecutionHistoryWorkerHistory(t *testing.T) (*common.ExecutionHistoryEntryStub, common.ExecutionHistoryStub) {
+	entry := &common.ExecutionHistoryEntryStub{
+		Start:   time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC),
+		End:     time.Date(2024, 1, 15, 10, 0, 5, 0, time.UTC),
+		TestRun: false,
+		Result: common.ExecutionHistoryResultEntryStub{
+			Result: "OK",
+			Logs:   "execution succeeded",
+		},
+	}
+	return entry, common.ExecutionHistoryStub{entry}
+}
+
+const testExecHistoryWorkerKey = "my-format-test-worker"
+
+func setupExecutionHistoryFormatTest(t *testing.T, workerHistory common.ExecutionHistoryStub) func(args ...string) error {
+	serverStub := common.NewServerStub(t).
+		WithWorkerExecutionHistory(testExecHistoryWorkerKey, workerHistory).
+		WithQueryParam("workerKey", testExecHistoryWorkerKey, common.EndpointExecutionHistory).
+		WithGetExecutionHistoryEndpoint()
+	common.NewMockWorkerServer(t, serverStub.WithDefaultActionsMetadataEndpoint())
+
+	runCmd := common.CreateCliRunner(t, GetInitCommand(), GetShowExecutionHistoryCommand())
+	common.PrepareWorkerDirForTest(t)
+	require.NoError(t, runCmd("worker", "init", "GENERIC_EVENT", testExecHistoryWorkerKey))
+	return runCmd
+}
+
+func TestWorkerExecutionHistory_FormatJSON(t *testing.T) {
+	entry, workerHistory := testExecutionHistoryWorkerHistory(t)
+	runCmd := setupExecutionHistoryFormatTest(t, workerHistory)
+
+	var out bytes.Buffer
+	common.SetCliOut(&out)
+	t.Cleanup(func() { common.SetCliOut(os.Stdout) })
+
+	require.NoError(t, runCmd("worker", "execution-history", "--"+format.FlagName, "json"))
+	assert.True(t, json.Valid(out.Bytes()), "expected valid JSON output, got: %s", out.String())
+	assert.Contains(t, out.String(), entry.Result.Result)
+}
+
+func TestWorkerExecutionHistory_FormatTable(t *testing.T) {
+	_, workerHistory := testExecutionHistoryWorkerHistory(t)
+	runCmd := setupExecutionHistoryFormatTest(t, workerHistory)
+
+	var out bytes.Buffer
+	common.SetCliOut(&out)
+	t.Cleanup(func() { common.SetCliOut(os.Stdout) })
+
+	require.NoError(t, runCmd("worker", "execution-history", "--"+format.FlagName, "table"))
+	outputStr := out.String()
+	assert.False(t, json.Valid([]byte(strings.TrimSpace(outputStr))), "table output should not be JSON, got: %s", outputStr)
+	assert.Contains(t, outputStr, "OK", "expected result value in table output, got: %s", outputStr)
+	assert.Contains(t, outputStr, "execution succeeded", "expected logs value in table output, got: %s", outputStr)
+}
+
+func TestWorkerExecutionHistory_FormatDefault(t *testing.T) {
+	_, workerHistory := testExecutionHistoryWorkerHistory(t)
+	runCmd := setupExecutionHistoryFormatTest(t, workerHistory)
+
+	var out bytes.Buffer
+	common.SetCliOut(&out)
+	t.Cleanup(func() { common.SetCliOut(os.Stdout) })
+
+	require.NoError(t, runCmd("worker", "execution-history"))
+	assert.True(t, json.Valid(out.Bytes()), "default output should be JSON, got: %s", out.String())
+}
+
+func TestWorkerExecutionHistory_FormatUnsupported(t *testing.T) {
+	_, workerHistory := testExecutionHistoryWorkerHistory(t)
+	runCmd := setupExecutionHistoryFormatTest(t, workerHistory)
+
+	err := runCmd("worker", "execution-history", "--"+format.FlagName, "sarif")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported format")
 }
