@@ -124,5 +124,5 @@ func TestWorkerListEvent_FormatUnsupported(t *testing.T) {
 	runCmd := common.CreateCliRunner(t, GetListEventsCommand())
 	err := runCmd("worker", "list-event", "--"+format.FlagName, "sarif")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unsupported format")
+	assert.Contains(t, err.Error(), "only the following output formats are supported")
 }

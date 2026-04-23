@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/jfrog/jfrog-cli-core/v2/common/format"
@@ -14,12 +13,13 @@ import (
 
 func GetListEventsCommand() components.Command {
 	return components.Command{
-		Name:        "list-event",
-		Description: "List available events.",
-		Aliases:     []string{"le"},
+		Name:             "list-event",
+		Description:      "List available events.",
+		Aliases:          []string{"le"},
+		SupportedFormats: []format.OutputFormat{format.Json, format.Table},
+		DefaultFormat:    format.None,
 		Flags: []components.Flag{
 			plugins_common.GetServerIdFlag(),
-			format.GetFormatFlag(format.Table, format.Json, format.Table),
 			model.GetTimeoutFlag(),
 			model.GetProjectKeyFlag(),
 		},
@@ -31,28 +31,44 @@ func GetListEventsCommand() components.Command {
 
 			projectKey := c.GetStringFlagValue(model.FlagProjectKey)
 
+			outputFormat, err := c.GetOutputFormat()
+			if err != nil {
+				return err
+			}
+
 			actionsMeta, err := common.FetchActions(c, server.Url, server.AccessToken, projectKey)
 			if err != nil {
 				return err
 			}
 
-			outputFormat, err := plugins_common.GetOutputFormat(c)
-			if err != nil {
-				return err
+			if outputFormat == format.None {
+				// Old behavior: no --format flag
+				return common.Print("%s", strings.Join(actionsMeta.ActionsNames(), ", "))
 			}
-
 			switch outputFormat {
 			case format.Json:
 				return common.PrintJSONValue(actionsMeta)
-			case format.Table:
-				return printListEventTable(actionsMeta)
 			default:
-				return fmt.Errorf("unsupported format '%s'. Accepted values: json, table", outputFormat)
+				return printListEventTable(actionsMeta)
 			}
 		},
 	}
 }
 
 func printListEventTable(actionsMeta common.ActionsMetadata) error {
-	return common.Print("%s", strings.Join(actionsMeta.ActionsNames(), ", "))
+	writer := common.NewCsvWriter()
+	if err := writer.Write([]string{"NAME", "APPLICATION", "DESCRIPTION"}); err != nil {
+		return err
+	}
+	for _, action := range actionsMeta {
+		if err := writer.Write([]string{
+			action.Action.Name,
+			action.Action.Application,
+			action.Description,
+		}); err != nil {
+			return err
+		}
+	}
+	writer.Flush()
+	return writer.Error()
 }

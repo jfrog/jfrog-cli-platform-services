@@ -29,12 +29,13 @@ type dryRunRequest struct {
 
 func GetDryRunCommand() components.Command {
 	return components.Command{
-		Name:        "test-run",
-		Description: "Dry run a worker",
-		Aliases:     []string{"dry-run", "dr", "tr"},
+		Name:             "test-run",
+		Description:      "Dry run a worker",
+		Aliases:          []string{"dry-run", "dr", "tr"},
+		SupportedFormats: []format.OutputFormat{format.Json, format.Table},
+		DefaultFormat:    format.Json,
 		Flags: []components.Flag{
 			plugins_common.GetServerIdFlag(),
-			format.GetFormatFlag(format.Json, format.Json, format.Table),
 			model.GetTimeoutFlag(),
 			model.GetNoSecretsFlag(),
 		},
@@ -42,6 +43,11 @@ func GetDryRunCommand() components.Command {
 			model.GetJSONPayloadArgument(),
 		},
 		Action: func(c *components.Context) error {
+			outputFormat, err := c.GetOutputFormat()
+			if err != nil {
+				return err
+			}
+
 			h := &dryRunHandler{c}
 
 			manifest, err := common.ReadManifest()
@@ -76,18 +82,13 @@ func GetDryRunCommand() components.Command {
 				}
 			}
 
-			return h.run(manifest, server.GetUrl(), server.GetAccessToken(), data)
+			return h.run(manifest, server.GetUrl(), server.GetAccessToken(), data, outputFormat)
 		},
 	}
 }
 
-func (c *dryRunHandler) run(manifest *model.Manifest, serverURL string, token string, data map[string]any) error {
+func (c *dryRunHandler) run(manifest *model.Manifest, serverURL string, token string, data map[string]any, outputFormat format.OutputFormat) error {
 	body, err := c.preparePayload(manifest, serverURL, token, data)
-	if err != nil {
-		return err
-	}
-
-	outputFormat, err := plugins_common.GetOutputFormat(c.ctx)
 	if err != nil {
 		return err
 	}
@@ -98,8 +99,6 @@ func (c *dryRunHandler) run(manifest *model.Manifest, serverURL string, token st
 		contentHandler = common.PrintJSON
 	case format.Table:
 		contentHandler = printDryRunResponseAsTable
-	default:
-		return fmt.Errorf("unsupported format '%s'. Accepted values: json, table", outputFormat)
 	}
 
 	return common.CallWorkerAPI(c.ctx, common.APICallParams{

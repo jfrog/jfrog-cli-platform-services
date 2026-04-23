@@ -43,14 +43,14 @@ func apiError(status int, message string, args ...any) *APIError {
 }
 
 type APICallParams struct {
-	Method      string
-	ServerURL   string
-	ServerToken string
-	Body        []byte
-	Query       map[string]string
-	Path        []string
-	ProjectKey  string
-	APIVersion  apiVersion
+	Method        string
+	ServerURL     string
+	ServerToken   string
+	Body          []byte
+	Query         map[string]string
+	Path          []string
+	ProjectKey    string
+	APIVersion    apiVersion
 	OkStatuses    []int
 	OnContent     APIContentHandler
 	CaptureStatus *int

@@ -232,5 +232,5 @@ func TestWorkerExecutionHistory_FormatUnsupported(t *testing.T) {
 
 	err := runCmd("worker", "execution-history", "--"+format.FlagName, "sarif")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unsupported format")
+	assert.Contains(t, err.Error(), "only the following output formats are supported")
 }

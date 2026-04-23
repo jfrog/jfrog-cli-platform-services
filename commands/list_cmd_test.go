@@ -183,7 +183,7 @@ func TestWorkerList_FormatUnsupported(t *testing.T) {
 	runCmd := common.CreateCliRunner(t, GetListCommand())
 	err := runCmd("worker", "list", "--"+format.FlagName, "sarif")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unsupported format")
+	assert.Contains(t, err.Error(), "only the following output formats are supported")
 }
 
 func TestWorkerList_LegacyJSONFlagDeprecated(t *testing.T) {

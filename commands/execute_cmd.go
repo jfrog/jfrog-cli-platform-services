@@ -18,12 +18,13 @@ import (
 
 func GetExecuteCommand() components.Command {
 	return components.Command{
-		Name:        "execute",
-		Description: "Execute a GENERIC_EVENT worker",
-		Aliases:     []string{"exec", "e"},
+		Name:             "execute",
+		Description:      "Execute a GENERIC_EVENT worker",
+		Aliases:          []string{"exec", "e"},
+		SupportedFormats: []format.OutputFormat{format.Json, format.Table},
+		DefaultFormat:    format.Json,
 		Flags: []components.Flag{
 			plugins_common.GetServerIdFlag(),
-			format.GetFormatFlag(format.Json, format.Json, format.Table),
 			model.GetTimeoutFlag(),
 			model.GetProjectKeyFlag(),
 		},
@@ -36,6 +37,19 @@ func GetExecuteCommand() components.Command {
 }
 
 func runExecuteCommand(c *components.Context) error {
+	outputFormat, err := c.GetOutputFormat()
+	if err != nil {
+		return err
+	}
+
+	var contentHandler func([]byte) error
+	switch outputFormat {
+	case format.Json:
+		contentHandler = common.PrintJSON
+	case format.Table:
+		contentHandler = printExecuteResponseAsTable
+	}
+
 	workerKey, projectKey, err := common.ExtractProjectAndKeyFromCommandContext(c, c.Arguments, 1, true)
 	if err != nil {
 		return err
@@ -60,21 +74,6 @@ func runExecuteCommand(c *components.Context) error {
 	body, err := json.Marshal(data)
 	if err != nil {
 		return err
-	}
-
-	outputFormat, err := plugins_common.GetOutputFormat(c)
-	if err != nil {
-		return err
-	}
-
-	var contentHandler func([]byte) error
-	switch outputFormat {
-	case format.Json:
-		contentHandler = common.PrintJSON
-	case format.Table:
-		contentHandler = printExecuteResponseAsTable
-	default:
-		return fmt.Errorf("unsupported format '%s'. Accepted values: json, table", outputFormat)
 	}
 
 	return common.CallWorkerAPI(c, common.APICallParams{

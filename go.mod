@@ -3,7 +3,7 @@ module github.com/jfrog/jfrog-cli-platform-services
 require (
 	github.com/google/uuid v1.6.0
 	github.com/jfrog/go-mockhttp v0.3.1
-	github.com/jfrog/jfrog-cli-core/v2 v2.60.1-0.20260423084213-8b15af782d27
+	github.com/jfrog/jfrog-cli-core/v2 v2.60.1-0.20260430091103-6242ecf15d29
 	github.com/jfrog/jfrog-client-go v1.55.1-0.20251223101502-1a13a993b0c7
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/stretchr/testify v1.11.1
@@ -42,7 +42,7 @@ require (
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/jedib0t/go-pretty/v6 v6.7.8 // indirect
 	github.com/jfrog/archiver/v3 v3.6.3 // indirect
-	github.com/jfrog/build-info-go v1.13.1-0.20260106203543-03b99793ca5a // indirect
+	github.com/jfrog/build-info-go v1.13.1-0.20260429070557-93b98034d295 // indirect
 	github.com/jfrog/gofrog v1.7.6 // indirect
 	github.com/kevinburke/ssh_config v1.4.0 // indirect
 	github.com/klauspost/compress v1.18.4 // indirect

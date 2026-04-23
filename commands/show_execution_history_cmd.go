@@ -13,26 +13,28 @@ import (
 	"github.com/jfrog/jfrog-cli-platform-services/model"
 )
 
-type executionHistoryResultEntry struct {
-	Result string `json:"result"`
-	Logs   string `json:"logs"`
-}
-
 type executionHistoryEntry struct {
-	Start   time.Time                   `json:"start"`
-	End     time.Time                   `json:"end"`
-	TestRun bool                        `json:"testRun"`
-	Entries executionHistoryResultEntry `json:"entries"`
+	WorkerKey        string `json:"workerKey"`
+	WorkerType       string `json:"workerType"`
+	WorkerProjectKey string `json:"workerProjectKey"`
+	ExecutionStatus  string `json:"executionStatus"`
+	StartTimeMillis  int64  `json:"startTimeMillis"`
+	EndTimeMillis    int64  `json:"endTimeMillis"`
+	TriggeredBy      string `json:"triggeredBy"`
+	TestRun          bool   `json:"testRun"`
+	ExecutedVersion  string `json:"executedVersion"`
+	TraceID          string `json:"traceId"`
 }
 
 func GetShowExecutionHistoryCommand() components.Command {
 	return components.Command{
-		Name:        "execution-history",
-		Description: "Show a worker execution history.",
-		Aliases:     []string{"exec-hist", "eh"},
+		Name:             "execution-history",
+		Description:      "Show a worker execution history.",
+		Aliases:          []string{"exec-hist", "eh"},
+		SupportedFormats: []format.OutputFormat{format.Json, format.Table},
+		DefaultFormat:    format.Json,
 		Flags: []components.Flag{
 			plugins_common.GetServerIdFlag(),
-			format.GetFormatFlag(format.Json, format.Json, format.Table),
 			model.GetTimeoutFlag(),
 			model.GetProjectKeyFlag(),
 			components.NewBoolFlag(
@@ -45,6 +47,19 @@ func GetShowExecutionHistoryCommand() components.Command {
 			model.GetWorkerKeyArgument(),
 		},
 		Action: func(c *components.Context) error {
+			outputFormat, err := c.GetOutputFormat()
+			if err != nil {
+				return err
+			}
+
+			var contentHandler func([]byte) error
+			switch outputFormat {
+			case format.Json:
+				contentHandler = common.PrintJSON
+			case format.Table:
+				contentHandler = printExecutionHistoryTable
+			}
+
 			workerKey, projectKey, err := common.ExtractProjectAndKeyFromCommandContext(c, c.Arguments, 1, false)
 			if err != nil {
 				return err
@@ -61,21 +76,6 @@ func GetShowExecutionHistoryCommand() components.Command {
 
 			if c.GetBoolFlagValue("with-test-runs") {
 				query["showTestRun"] = "true"
-			}
-
-			outputFormat, err := plugins_common.GetOutputFormat(c)
-			if err != nil {
-				return err
-			}
-
-			var contentHandler func([]byte) error
-			switch outputFormat {
-			case format.Json:
-				contentHandler = common.PrintJSON
-			case format.Table:
-				contentHandler = printExecutionHistoryTable
-			default:
-				return fmt.Errorf("unsupported format '%s'. Accepted values: json, table", outputFormat)
 			}
 
 			return common.CallWorkerAPI(c, common.APICallParams{
@@ -99,13 +99,36 @@ func printExecutionHistoryTable(responseBytes []byte) error {
 	}
 
 	writer := common.NewCsvWriter()
+
+	if err := writer.Write([]string{
+		"Worker Key",
+		"Worker Type",
+		"Project Key",
+		"Status",
+		"Started At",
+		"Ended At",
+		"Triggered By",
+		"Test Run",
+		"Executed Version",
+		"Trace ID",
+	}); err != nil {
+		return err
+	}
+
 	for _, entry := range entries {
+		startedAt := time.UnixMilli(entry.StartTimeMillis).UTC().Format(time.RFC3339)
+		endedAt := time.UnixMilli(entry.EndTimeMillis).UTC().Format(time.RFC3339)
 		if err := writer.Write([]string{
-			entry.Start.Format(time.RFC3339),
-			entry.End.Format(time.RFC3339),
+			entry.WorkerKey,
+			entry.WorkerType,
+			entry.WorkerProjectKey,
+			entry.ExecutionStatus,
+			startedAt,
+			endedAt,
+			entry.TriggeredBy,
 			fmt.Sprint(entry.TestRun),
-			entry.Entries.Result,
-			entry.Entries.Logs,
+			entry.ExecutedVersion,
+			entry.TraceID,
 		}); err != nil {
 			return err
 		}

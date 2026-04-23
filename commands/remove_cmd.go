@@ -17,12 +17,12 @@ import (
 
 func GetRemoveCommand() components.Command {
 	return components.Command{
-		Name:        "undeploy",
-		Description: "Undeploy a worker",
-		Aliases:     []string{"rm"},
+		Name:             "undeploy",
+		Description:      "Undeploy a worker",
+		Aliases:          []string{"rm"},
+		SupportedFormats: []format.OutputFormat{format.Json},
 		Flags: []components.Flag{
 			plugins_common.GetServerIdFlag(),
-			format.GetFormatFlag(format.Json, format.Json),
 			model.GetTimeoutFlag(),
 		},
 		Arguments: []components.Argument{
@@ -46,12 +46,8 @@ func runRemoveCommand(c *components.Context) error {
 	var responseStatus int
 	var contentHandler common.APIContentHandler
 	if slices.Contains(c.FlagsUsed, format.FlagName) {
-		outputFormat, fmtErr := plugins_common.GetOutputFormat(c)
-		if fmtErr != nil {
+		if _, fmtErr := c.GetOutputFormat(); fmtErr != nil {
 			return fmtErr
-		}
-		if outputFormat != format.Json {
-			return fmt.Errorf("unsupported format '%s' for worker undeploy. Only json is supported", outputFormat)
 		}
 		contentHandler = func(body []byte) error {
 			return common.PrintJSONOrStatus(responseStatus, body)

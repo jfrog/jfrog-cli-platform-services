@@ -22,12 +22,13 @@ type getAllResponse struct {
 
 func GetListCommand() components.Command {
 	return components.Command{
-		Name:        "list",
-		Description: "List workers. The default output is a CSV format with columns <name>,<action>,<description>,<enabled>.",
-		Aliases:     []string{"ls"},
+		Name:             "list",
+		Description:      "List workers. The default output is a CSV format with columns <name>,<action>,<description>,<enabled>.",
+		Aliases:          []string{"ls"},
+		SupportedFormats: []format.OutputFormat{format.Json, format.Table},
+		DefaultFormat:    format.Table,
 		Flags: []components.Flag{
 			plugins_common.GetServerIdFlag(),
-			format.GetFormatFlag(format.Table, format.Json, format.Table),
 			model.GetJSONOutputFlag("Deprecated: use --format json instead."),
 			model.GetTimeoutFlag(),
 			model.GetProjectKeyFlag(),
@@ -61,7 +62,7 @@ func runListCommand(ctx *components.Context, serverURL string, token string) err
 		params["action"] = action
 	}
 
-	outputFormat, err := plugins_common.GetOutputFormat(ctx)
+	outputFormat, err := ctx.GetOutputFormat()
 	if err != nil {
 		return err
 	}
@@ -76,8 +77,6 @@ func runListCommand(ctx *components.Context, serverURL string, token string) err
 		contentHandler = common.PrintJSON
 	case format.Table:
 		contentHandler = printWorkerDetailsAsCsv
-	default:
-		return fmt.Errorf("unsupported format '%s'. Accepted values: json, table", outputFormat)
 	}
 
 	return common.CallWorkerAPI(ctx, common.APICallParams{

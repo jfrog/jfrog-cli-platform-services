@@ -141,7 +141,7 @@ func TestWorkerRemove_FormatTableRejected(t *testing.T) {
 
 	err := runCmd("worker", "undeploy", "--"+format.FlagName, "table")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unsupported format")
+	assert.Contains(t, err.Error(), "only the following output formats are supported")
 }
 
 func TestWorkerRemove_NoFormat(t *testing.T) {
