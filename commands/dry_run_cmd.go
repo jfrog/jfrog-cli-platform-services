@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/jfrog/jfrog-cli-core/v2/common/format"
 	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 
 	"github.com/jfrog/jfrog-client-go/utils/log"
@@ -34,7 +33,6 @@ func GetDryRunCommand() components.Command {
 		Aliases:     []string{"dry-run", "dr", "tr"},
 		Flags: []components.Flag{
 			plugins_common.GetServerIdFlag(),
-			format.GetFormatFlag(format.Json, format.Json, format.Table),
 			model.GetTimeoutFlag(),
 			model.GetNoSecretsFlag(),
 		},
@@ -86,22 +84,6 @@ func (c *dryRunHandler) run(manifest *model.Manifest, serverURL string, token st
 	if err != nil {
 		return err
 	}
-
-	outputFormat, err := plugins_common.GetOutputFormat(c.ctx)
-	if err != nil {
-		return err
-	}
-
-	var contentHandler func([]byte) error
-	switch outputFormat {
-	case format.Json:
-		contentHandler = common.PrintJSON
-	case format.Table:
-		contentHandler = printDryRunResponseAsTable
-	default:
-		return fmt.Errorf("unsupported format '%s'. Accepted values: json, table", outputFormat)
-	}
-
 	return common.CallWorkerAPI(c.ctx, common.APICallParams{
 		Method:      http.MethodPost,
 		ServerURL:   serverURL,
@@ -113,24 +95,8 @@ func (c *dryRunHandler) run(manifest *model.Manifest, serverURL string, token st
 		},
 		OkStatuses: []int{http.StatusOK},
 		Path:       []string{"test", manifest.Name},
-		OnContent:  contentHandler,
+		OnContent:  common.PrintJSON,
 	})
-}
-
-func printDryRunResponseAsTable(responseBytes []byte) error {
-	var data map[string]any
-	if err := json.Unmarshal(responseBytes, &data); err != nil {
-		return common.PrintJSON(responseBytes)
-	}
-
-	writer := common.NewCsvWriter()
-	for k, v := range data {
-		if err := writer.Write([]string{k, fmt.Sprint(v)}); err != nil {
-			return err
-		}
-	}
-	writer.Flush()
-	return writer.Error()
 }
 
 func (c *dryRunHandler) preparePayload(manifest *model.Manifest, serverURL string, token string, data map[string]any) ([]byte, error) {

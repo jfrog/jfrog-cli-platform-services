@@ -4,16 +4,13 @@
 package commands
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
-	"github.com/jfrog/jfrog-cli-core/v2/common/format"
 	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 
 	"github.com/stretchr/testify/assert"
@@ -346,50 +343,4 @@ func getExpectedDeployRequestForAction(
 	}
 
 	return r
-}
-
-func setupDeployFormatTest(t *testing.T) (func(args ...string) error, *bytes.Buffer) {
-	t.Helper()
-
-	serverStub := common.NewServerStub(t).
-		WithDefaultActionsMetadataEndpoint().
-		WithGetOneEndpoint().
-		WithOptionsEndpoint().
-		WithCreateEndpoint(nil)
-	common.NewMockWorkerServer(t, serverStub)
-
-	runCmd := common.CreateCliRunner(t, GetInitCommand(), GetDeployCommand())
-
-	_, workerName := common.PrepareWorkerDirForTest(t)
-	require.NoError(t, runCmd("worker", "init", "BEFORE_UPLOAD", workerName))
-
-	var out bytes.Buffer
-	common.SetCliOut(&out)
-	t.Cleanup(func() { common.SetCliOut(os.Stdout) })
-
-	return runCmd, &out
-}
-
-func TestWorkerDeploy_FormatJSON(t *testing.T) {
-	runCmd, out := setupDeployFormatTest(t)
-
-	require.NoError(t, runCmd("worker", "deploy", "--"+format.FlagName, "json"))
-	assert.True(t, json.Valid(out.Bytes()), "expected valid JSON output, got: %s", out.String())
-	assert.Contains(t, out.String(), "status_code")
-	assert.Contains(t, out.String(), "content")
-}
-
-func TestWorkerDeploy_FormatTableRejected(t *testing.T) {
-	runCmd, _ := setupDeployFormatTest(t)
-
-	err := runCmd("worker", "deploy", "--"+format.FlagName, "table")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unsupported format")
-}
-
-func TestWorkerDeploy_NoFormat(t *testing.T) {
-	runCmd, out := setupDeployFormatTest(t)
-
-	require.NoError(t, runCmd("worker", "deploy"))
-	assert.Empty(t, out.String(), "expected no JSON output when --format is not set, got: %s", out.String())
 }

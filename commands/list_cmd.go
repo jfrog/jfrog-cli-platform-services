@@ -7,12 +7,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/jfrog/jfrog-cli-core/v2/common/format"
+	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
+
 	plugins_common "github.com/jfrog/jfrog-cli-core/v2/plugins/common"
 	"github.com/jfrog/jfrog-cli-core/v2/plugins/components"
-	"github.com/jfrog/jfrog-client-go/utils/log"
-
-	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 	"github.com/jfrog/jfrog-cli-platform-services/model"
 )
 
@@ -27,8 +25,7 @@ func GetListCommand() components.Command {
 		Aliases:     []string{"ls"},
 		Flags: []components.Flag{
 			plugins_common.GetServerIdFlag(),
-			format.GetFormatFlag(format.Table, format.Json, format.Table),
-			model.GetJSONOutputFlag("Deprecated: use --format json instead."),
+			model.GetJSONOutputFlag("Use JSON instead of CSV as output"),
 			model.GetTimeoutFlag(),
 			model.GetProjectKeyFlag(),
 		},
@@ -61,23 +58,9 @@ func runListCommand(ctx *components.Context, serverURL string, token string) err
 		params["action"] = action
 	}
 
-	outputFormat, err := plugins_common.GetOutputFormat(ctx)
-	if err != nil {
-		return err
-	}
+	contentHandler := printWorkerDetailsAsCsv
 	if ctx.GetBoolFlagValue(model.FlagJSONOutput) {
-		log.Warn("--json is deprecated, use --format json instead.")
-		outputFormat = format.Json
-	}
-
-	var contentHandler func([]byte) error
-	switch outputFormat {
-	case format.Json:
 		contentHandler = common.PrintJSON
-	case format.Table:
-		contentHandler = printWorkerDetailsAsCsv
-	default:
-		return fmt.Errorf("unsupported format '%s'. Accepted values: json, table", outputFormat)
 	}
 
 	return common.CallWorkerAPI(ctx, common.APICallParams{

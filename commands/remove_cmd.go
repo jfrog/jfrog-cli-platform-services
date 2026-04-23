@@ -3,9 +3,7 @@ package commands
 import (
 	"fmt"
 	"net/http"
-	"slices"
 
-	"github.com/jfrog/jfrog-cli-core/v2/common/format"
 	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 
 	plugins_common "github.com/jfrog/jfrog-cli-core/v2/plugins/common"
@@ -22,7 +20,6 @@ func GetRemoveCommand() components.Command {
 		Aliases:     []string{"rm"},
 		Flags: []components.Flag{
 			plugins_common.GetServerIdFlag(),
-			format.GetFormatFlag(format.Json, format.Json),
 			model.GetTimeoutFlag(),
 		},
 		Arguments: []components.Argument{
@@ -43,37 +40,18 @@ func runRemoveCommand(c *components.Context) error {
 		return err
 	}
 
-	var responseStatus int
-	var contentHandler common.APIContentHandler
-	if slices.Contains(c.FlagsUsed, format.FlagName) {
-		outputFormat, fmtErr := plugins_common.GetOutputFormat(c)
-		if fmtErr != nil {
-			return fmtErr
-		}
-		if outputFormat != format.Json {
-			return fmt.Errorf("unsupported format '%s' for worker undeploy. Only json is supported", outputFormat)
-		}
-		contentHandler = func(body []byte) error {
-			return common.PrintJSONOrStatus(responseStatus, body)
-		}
-	}
-
 	log.Info(fmt.Sprintf("Removing worker '%s' ...", workerKey))
 
 	err = common.CallWorkerAPI(c, common.APICallParams{
-		Method:        http.MethodDelete,
-		ServerURL:     server.GetUrl(),
-		ServerToken:   server.GetAccessToken(),
-		OkStatuses:    []int{http.StatusNoContent},
-		Path:          []string{"workers", workerKey},
-		OnContent:     contentHandler,
-		CaptureStatus: &responseStatus,
+		Method:      http.MethodDelete,
+		ServerURL:   server.GetUrl(),
+		ServerToken: server.GetAccessToken(),
+		OkStatuses:  []int{http.StatusNoContent},
+		Path:        []string{"workers", workerKey},
 	})
-	if err != nil {
-		return err
+	if err == nil {
+		log.Info(fmt.Sprintf("Worker '%s' removed", workerKey))
 	}
 
-	log.Info(fmt.Sprintf("Worker '%s' removed", workerKey))
-
-	return nil
+	return err
 }

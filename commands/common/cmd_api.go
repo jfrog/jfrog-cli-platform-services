@@ -51,9 +51,8 @@ type APICallParams struct {
 	Path        []string
 	ProjectKey  string
 	APIVersion  apiVersion
-	OkStatuses    []int
-	OnContent     APIContentHandler
-	CaptureStatus *int
+	OkStatuses  []int
+	OnContent   APIContentHandler
 }
 
 func CallWorkerAPI(c model.IntFlagProvider, params APICallParams) error {
@@ -112,10 +111,6 @@ func CallWorkerAPI(c model.IntFlagProvider, params APICallParams) error {
 		// We the response contains json content, we will print it
 		_ = processAPIResponse(res, printJSONOrLogError)
 		return apiError(res.StatusCode, "command %s %s returned an unexpected status code %d", params.Method, apiEndpoint, res.StatusCode)
-	}
-
-	if params.CaptureStatus != nil {
-		*params.CaptureStatus = res.StatusCode
 	}
 
 	return processAPIResponse(res, params.OnContent)

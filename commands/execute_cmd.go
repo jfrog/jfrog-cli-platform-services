@@ -2,10 +2,8 @@ package commands
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
-	"github.com/jfrog/jfrog-cli-core/v2/common/format"
 	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 
 	"github.com/jfrog/jfrog-client-go/utils/log"
@@ -23,7 +21,6 @@ func GetExecuteCommand() components.Command {
 		Aliases:     []string{"exec", "e"},
 		Flags: []components.Flag{
 			plugins_common.GetServerIdFlag(),
-			format.GetFormatFlag(format.Json, format.Json, format.Table),
 			model.GetTimeoutFlag(),
 			model.GetProjectKeyFlag(),
 		},
@@ -62,21 +59,6 @@ func runExecuteCommand(c *components.Context) error {
 		return err
 	}
 
-	outputFormat, err := plugins_common.GetOutputFormat(c)
-	if err != nil {
-		return err
-	}
-
-	var contentHandler func([]byte) error
-	switch outputFormat {
-	case format.Json:
-		contentHandler = common.PrintJSON
-	case format.Table:
-		contentHandler = printExecuteResponseAsTable
-	default:
-		return fmt.Errorf("unsupported format '%s'. Accepted values: json, table", outputFormat)
-	}
-
 	return common.CallWorkerAPI(c, common.APICallParams{
 		Method:      http.MethodPost,
 		ServerURL:   server.GetUrl(),
@@ -85,22 +67,6 @@ func runExecuteCommand(c *components.Context) error {
 		Body:        body,
 		ProjectKey:  projectKey,
 		Path:        []string{"execute", workerKey},
-		OnContent:   contentHandler,
+		OnContent:   common.PrintJSON,
 	})
-}
-
-func printExecuteResponseAsTable(responseBytes []byte) error {
-	var data map[string]any
-	if err := json.Unmarshal(responseBytes, &data); err != nil {
-		return common.PrintJSON(responseBytes)
-	}
-
-	writer := common.NewCsvWriter()
-	for k, v := range data {
-		if err := writer.Write([]string{k, fmt.Sprint(v)}); err != nil {
-			return err
-		}
-	}
-	writer.Flush()
-	return writer.Error()
 }
