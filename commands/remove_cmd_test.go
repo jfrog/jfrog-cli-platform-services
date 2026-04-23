@@ -5,10 +5,12 @@ package commands
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/jfrog/jfrog-cli-core/v2/common/format"
 	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 
 	"github.com/stretchr/testify/assert"
@@ -101,4 +103,50 @@ func TestRemoveCommand(t *testing.T) {
 			}
 		})
 	}
+}
+
+func setupRemoveFormatTest(t *testing.T) (func(args ...string) error, *bytes.Buffer) {
+	t.Helper()
+
+	serverStub := common.NewServerStub(t).
+		WithDefaultActionsMetadataEndpoint().
+		WithWorkers(&model.WorkerDetails{Key: "wk-0"}).
+		WithDeleteEndpoint()
+	common.NewMockWorkerServer(t, serverStub)
+
+	runCmd := common.CreateCliRunner(t, GetInitCommand(), GetRemoveCommand())
+
+	_, workerName := common.PrepareWorkerDirForTest(t)
+	workerName = "wk-0"
+	require.NoError(t, runCmd("worker", "init", "BEFORE_UPLOAD", workerName))
+
+	var out bytes.Buffer
+	common.SetCliOut(&out)
+	t.Cleanup(func() { common.SetCliOut(os.Stdout) })
+
+	return runCmd, &out
+}
+
+func TestWorkerRemove_FormatJSON(t *testing.T) {
+	runCmd, out := setupRemoveFormatTest(t)
+
+	require.NoError(t, runCmd("worker", "undeploy", "--"+format.FlagName, "json"))
+	assert.True(t, json.Valid(out.Bytes()), "expected valid JSON output, got: %s", out.String())
+	assert.Contains(t, out.String(), "status_code")
+	assert.Contains(t, out.String(), "message")
+}
+
+func TestWorkerRemove_FormatTableRejected(t *testing.T) {
+	runCmd, _ := setupRemoveFormatTest(t)
+
+	err := runCmd("worker", "undeploy", "--"+format.FlagName, "table")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported format")
+}
+
+func TestWorkerRemove_NoFormat(t *testing.T) {
+	runCmd, out := setupRemoveFormatTest(t)
+
+	require.NoError(t, runCmd("worker", "undeploy"))
+	assert.Empty(t, out.String(), "expected no JSON output when --format is not set, got: %s", out.String())
 }

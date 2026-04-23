@@ -3,7 +3,9 @@ package commands
 import (
 	"fmt"
 	"net/http"
+	"slices"
 
+	"github.com/jfrog/jfrog-cli-core/v2/common/format"
 	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 
 	plugins_common "github.com/jfrog/jfrog-cli-core/v2/plugins/common"
@@ -20,6 +22,7 @@ func GetRemoveCommand() components.Command {
 		Aliases:     []string{"rm"},
 		Flags: []components.Flag{
 			plugins_common.GetServerIdFlag(),
+			format.GetFormatFlag(format.Json, format.Json),
 			model.GetTimeoutFlag(),
 		},
 		Arguments: []components.Argument{
@@ -49,9 +52,24 @@ func runRemoveCommand(c *components.Context) error {
 		OkStatuses:  []int{http.StatusNoContent},
 		Path:        []string{"workers", workerKey},
 	})
-	if err == nil {
-		log.Info(fmt.Sprintf("Worker '%s' removed", workerKey))
+	if err != nil {
+		return err
 	}
 
-	return err
+	log.Info(fmt.Sprintf("Worker '%s' removed", workerKey))
+
+	if slices.Contains(c.FlagsUsed, format.FlagName) {
+		outputFormat, fmtErr := plugins_common.GetOutputFormat(c)
+		if fmtErr != nil {
+			return fmtErr
+		}
+		switch outputFormat {
+		case format.Json:
+			return common.PrintJSONValue(map[string]any{"status_code": 200, "message": "OK"})
+		default:
+			return fmt.Errorf("unsupported format '%s' for worker undeploy. Only json is supported", outputFormat)
+		}
+	}
+
+	return nil
 }
