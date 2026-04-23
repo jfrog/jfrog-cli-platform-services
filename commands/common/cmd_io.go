@@ -42,6 +42,17 @@ func PrintJSON(data []byte) error {
 	return err
 }
 
+// PrintJSONValue marshals v to indented JSON and writes it to the CLI output.
+// Use instead of json.Marshal + PrintJSON when the struct is already available.
+func PrintJSONValue(v any) error {
+	data, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return err
+	}
+	_, err = cliOut.Write(data)
+	return err
+}
+
 func printJSONOrLogError(data []byte) error {
 	if _, writeErr := cliOut.Write(PrettifyJSON(data)); writeErr != nil {
 		log.Warn(fmt.Sprintf("Write error: %+v (data:%s)", writeErr, string(data)))
