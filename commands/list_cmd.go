@@ -10,6 +10,8 @@ import (
 	"github.com/jfrog/jfrog-cli-core/v2/common/format"
 	plugins_common "github.com/jfrog/jfrog-cli-core/v2/plugins/common"
 	"github.com/jfrog/jfrog-cli-core/v2/plugins/components"
+	"github.com/jfrog/jfrog-client-go/utils/log"
+
 	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 	"github.com/jfrog/jfrog-cli-platform-services/model"
 )
@@ -26,6 +28,7 @@ func GetListCommand() components.Command {
 		Flags: []components.Flag{
 			plugins_common.GetServerIdFlag(),
 			format.GetFormatFlag(format.Table, format.Json, format.Table),
+			model.GetJSONOutputFlag("Deprecated: use --format json instead."),
 			model.GetTimeoutFlag(),
 			model.GetProjectKeyFlag(),
 		},
@@ -61,6 +64,10 @@ func runListCommand(ctx *components.Context, serverURL string, token string) err
 	outputFormat, err := plugins_common.GetOutputFormat(ctx)
 	if err != nil {
 		return err
+	}
+	if ctx.GetBoolFlagValue(model.FlagJSONOutput) {
+		log.Warn("--json is deprecated, use --format json instead.")
+		outputFormat = format.Json
 	}
 
 	var contentHandler func([]byte) error
