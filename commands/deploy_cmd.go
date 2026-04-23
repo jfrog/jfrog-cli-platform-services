@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 
+	"github.com/jfrog/jfrog-cli-core/v2/common/format"
 	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 
 	plugins_common "github.com/jfrog/jfrog-cli-core/v2/plugins/common"
@@ -35,6 +37,7 @@ func GetDeployCommand() components.Command {
 		Aliases:     []string{"d"},
 		Flags: []components.Flag{
 			plugins_common.GetServerIdFlag(),
+			format.GetFormatFlag(format.Json, format.Json),
 			model.GetTimeoutFlag(),
 			model.GetNoSecretsFlag(),
 			model.GetChangesVersionFlag(),
@@ -137,24 +140,40 @@ func runDeployCommand(ctx *components.Context, manifest *model.Manifest, actionM
 		if err == nil {
 			log.Info(fmt.Sprintf("Worker '%s' deployed", manifest.Name))
 		}
+	} else {
+		log.Info(fmt.Sprintf("Updating worker '%s'", manifest.Name))
+		err = common.CallWorkerAPI(ctx, common.APICallParams{
+			Method:      http.MethodPut,
+			ServerURL:   serverURL,
+			ServerToken: token,
+			Body:        bodyBytes,
+			OkStatuses:  []int{http.StatusNoContent},
+			Path:        []string{"workers"},
+			APIVersion:  common.APIVersionV2,
+		})
+		if err == nil {
+			log.Info(fmt.Sprintf("Worker '%s' updated", manifest.Name))
+		}
+	}
+
+	if err != nil {
 		return err
 	}
 
-	log.Info(fmt.Sprintf("Updating worker '%s'", manifest.Name))
-	err = common.CallWorkerAPI(ctx, common.APICallParams{
-		Method:      http.MethodPut,
-		ServerURL:   serverURL,
-		ServerToken: token,
-		Body:        bodyBytes,
-		OkStatuses:  []int{http.StatusNoContent},
-		Path:        []string{"workers"},
-		APIVersion:  common.APIVersionV2,
-	})
-	if err == nil {
-		log.Info(fmt.Sprintf("Worker '%s' updated", manifest.Name))
+	if slices.Contains(ctx.FlagsUsed, format.FlagName) {
+		outputFormat, fmtErr := plugins_common.GetOutputFormat(ctx)
+		if fmtErr != nil {
+			return fmtErr
+		}
+		switch outputFormat {
+		case format.Json:
+			return common.PrintJSONValue(map[string]any{"status_code": 200, "message": "OK"})
+		default:
+			return fmt.Errorf("unsupported format '%s' for worker deploy. Only json is supported", outputFormat)
+		}
 	}
 
-	return err
+	return nil
 }
 
 func prepareDeployRequest(ctx *components.Context, manifest *model.Manifest, actionMeta *model.ActionMetadata, version *model.Version, existingWorker *model.WorkerDetails, encodeSourceCodeInBase64 bool) (*deployRequest, error) {
