@@ -5,13 +5,17 @@ package commands
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/jfrog/jfrog-cli-core/v2/common/format"
 	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
-
 	"github.com/jfrog/jfrog-cli-platform-services/model"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDryRun(t *testing.T) {
@@ -196,4 +200,60 @@ func validateTestPayloadData(data any) common.BodyValidator {
 		}
 		return gotData
 	})
+}
+
+const workerKeyForDryRunTest = "test-worker"
+
+func setupDryRunFormatTest(t *testing.T) (func(args ...string) error, *bytes.Buffer) {
+	t.Helper()
+
+	workerKey := workerKeyForDryRunTest
+	serverStub := common.NewServerStub(t).
+		WithWorkers(&model.WorkerDetails{Key: workerKey}).
+		WithDefaultActionsMetadataEndpoint().
+		WithGetOneEndpoint().
+		WithTestEndpoint(nil, map[string]any{"status": "OK", "result": "done"})
+	common.NewMockWorkerServer(t, serverStub)
+
+	common.PrepareWorkerDirForTest(t)
+
+	runCmd := common.CreateCliRunner(t, GetInitCommand(), GetDryRunCommand())
+	require.NoError(t, runCmd("worker", "init", "BEFORE_DOWNLOAD", workerKey))
+
+	var out bytes.Buffer
+	common.SetCliOut(&out)
+	t.Cleanup(func() { common.SetCliOut(os.Stdout) })
+
+	return runCmd, &out
+}
+
+func TestWorkerDryRun_FormatJSON(t *testing.T) {
+	runCmd, out := setupDryRunFormatTest(t)
+
+	require.NoError(t, runCmd("worker", "dry-run", "--"+format.FlagName, "json", `{}`))
+	assert.True(t, json.Valid(out.Bytes()), "expected valid JSON output, got: %s", out.String())
+}
+
+func TestWorkerDryRun_FormatTable(t *testing.T) {
+	runCmd, out := setupDryRunFormatTest(t)
+
+	require.NoError(t, runCmd("worker", "dry-run", "--"+format.FlagName, "table", `{}`))
+	outputStr := out.String()
+	assert.True(t, strings.Contains(outputStr, "status") || strings.Contains(outputStr, "result"),
+		"expected table output to contain response fields, got: %s", outputStr)
+}
+
+func TestWorkerDryRun_FormatDefault(t *testing.T) {
+	runCmd, out := setupDryRunFormatTest(t)
+
+	require.NoError(t, runCmd("worker", "dry-run", `{}`))
+	assert.True(t, json.Valid(out.Bytes()), "default output should be valid JSON, got: %s", out.String())
+}
+
+func TestWorkerDryRun_FormatUnsupported(t *testing.T) {
+	runCmd, _ := setupDryRunFormatTest(t)
+
+	err := runCmd("worker", "dry-run", "--"+format.FlagName, "sarif", `{}`)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported format")
 }
