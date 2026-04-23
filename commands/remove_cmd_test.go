@@ -133,7 +133,7 @@ func TestWorkerRemove_FormatJSON(t *testing.T) {
 	require.NoError(t, runCmd("worker", "undeploy", "--"+format.FlagName, "json"))
 	assert.True(t, json.Valid(out.Bytes()), "expected valid JSON output, got: %s", out.String())
 	assert.Contains(t, out.String(), "status_code")
-	assert.Contains(t, out.String(), "message")
+	assert.Contains(t, out.String(), "content")
 }
 
 func TestWorkerRemove_FormatTableRejected(t *testing.T) {

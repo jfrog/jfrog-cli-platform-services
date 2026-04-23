@@ -43,33 +43,37 @@ func runRemoveCommand(c *components.Context) error {
 		return err
 	}
 
+	var responseStatus int
+	var contentHandler common.APIContentHandler
+	if slices.Contains(c.FlagsUsed, format.FlagName) {
+		outputFormat, fmtErr := plugins_common.GetOutputFormat(c)
+		if fmtErr != nil {
+			return fmtErr
+		}
+		if outputFormat != format.Json {
+			return fmt.Errorf("unsupported format '%s' for worker undeploy. Only json is supported", outputFormat)
+		}
+		contentHandler = func(body []byte) error {
+			return common.PrintJSONOrStatus(responseStatus, body)
+		}
+	}
+
 	log.Info(fmt.Sprintf("Removing worker '%s' ...", workerKey))
 
 	err = common.CallWorkerAPI(c, common.APICallParams{
-		Method:      http.MethodDelete,
-		ServerURL:   server.GetUrl(),
-		ServerToken: server.GetAccessToken(),
-		OkStatuses:  []int{http.StatusNoContent},
-		Path:        []string{"workers", workerKey},
+		Method:        http.MethodDelete,
+		ServerURL:     server.GetUrl(),
+		ServerToken:   server.GetAccessToken(),
+		OkStatuses:    []int{http.StatusNoContent},
+		Path:          []string{"workers", workerKey},
+		OnContent:     contentHandler,
+		CaptureStatus: &responseStatus,
 	})
 	if err != nil {
 		return err
 	}
 
 	log.Info(fmt.Sprintf("Worker '%s' removed", workerKey))
-
-	if slices.Contains(c.FlagsUsed, format.FlagName) {
-		outputFormat, fmtErr := plugins_common.GetOutputFormat(c)
-		if fmtErr != nil {
-			return fmtErr
-		}
-		switch outputFormat {
-		case format.Json:
-			return common.PrintJSONValue(map[string]any{"status_code": 200, "message": "OK"})
-		default:
-			return fmt.Errorf("unsupported format '%s' for worker undeploy. Only json is supported", outputFormat)
-		}
-	}
 
 	return nil
 }
