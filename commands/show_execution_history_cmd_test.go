@@ -19,23 +19,20 @@ import (
 )
 
 func TestExecutionHistory(t *testing.T) {
+	now := time.Now()
 	entry := &common.ExecutionHistoryEntryStub{
-		Start:   time.Now(),
-		End:     time.Now().Add(5 * time.Second),
-		TestRun: false,
-		Result: common.ExecutionHistoryResultEntryStub{
-			Result: "OK",
-			Logs:   "not a test run",
-		},
+		WorkerKey:       "my-worker",
+		ExecutionStatus: "OK",
+		StartTimeMillis: now.UnixMilli(),
+		EndTimeMillis:   now.Add(5 * time.Second).UnixMilli(),
+		TestRun:         false,
 	}
 	testRunEntry := &common.ExecutionHistoryEntryStub{
-		Start:   time.Now().Add(-24 * time.Hour),
-		End:     time.Now().Add(-23 * time.Hour),
-		TestRun: true,
-		Result: common.ExecutionHistoryResultEntryStub{
-			Result: "KO",
-			Logs:   "test run",
-		},
+		WorkerKey:       "my-worker",
+		ExecutionStatus: "KO",
+		StartTimeMillis: now.Add(-24 * time.Hour).UnixMilli(),
+		EndTimeMillis:   now.Add(-23 * time.Hour).UnixMilli(),
+		TestRun:         true,
 	}
 
 	workerHistory := common.ExecutionHistoryStub{entry, testRunEntry}
@@ -160,13 +157,11 @@ func TestExecutionHistory(t *testing.T) {
 
 func testExecutionHistoryWorkerHistory(t *testing.T) (*common.ExecutionHistoryEntryStub, common.ExecutionHistoryStub) {
 	entry := &common.ExecutionHistoryEntryStub{
-		Start:   time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC),
-		End:     time.Date(2024, 1, 15, 10, 0, 5, 0, time.UTC),
-		TestRun: false,
-		Result: common.ExecutionHistoryResultEntryStub{
-			Result: "OK",
-			Logs:   "execution succeeded",
-		},
+		WorkerKey:       testExecHistoryWorkerKey,
+		ExecutionStatus: "OK",
+		StartTimeMillis: time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC).UnixMilli(),
+		EndTimeMillis:   time.Date(2024, 1, 15, 10, 0, 5, 0, time.UTC).UnixMilli(),
+		TestRun:         false,
 	}
 	return entry, common.ExecutionHistoryStub{entry}
 }
@@ -196,7 +191,7 @@ func TestWorkerExecutionHistory_FormatJSON(t *testing.T) {
 
 	require.NoError(t, runCmd("worker", "execution-history", "--"+format.FlagName, "json"))
 	assert.True(t, json.Valid(out.Bytes()), "expected valid JSON output, got: %s", out.String())
-	assert.Contains(t, out.String(), entry.Result.Result)
+	assert.Contains(t, out.String(), entry.ExecutionStatus)
 }
 
 func TestWorkerExecutionHistory_FormatTable(t *testing.T) {
@@ -210,8 +205,8 @@ func TestWorkerExecutionHistory_FormatTable(t *testing.T) {
 	require.NoError(t, runCmd("worker", "execution-history", "--"+format.FlagName, "table"))
 	outputStr := out.String()
 	assert.False(t, json.Valid([]byte(strings.TrimSpace(outputStr))), "table output should not be JSON, got: %s", outputStr)
-	assert.Contains(t, outputStr, "OK", "expected result value in table output, got: %s", outputStr)
-	assert.Contains(t, outputStr, "execution succeeded", "expected logs value in table output, got: %s", outputStr)
+	assert.Contains(t, outputStr, "OK", "expected execution status in table output, got: %s", outputStr)
+	assert.Contains(t, outputStr, testExecHistoryWorkerKey, "expected worker key in table output, got: %s", outputStr)
 }
 
 func TestWorkerExecutionHistory_FormatDefault(t *testing.T) {

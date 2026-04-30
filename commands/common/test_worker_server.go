@@ -85,16 +85,17 @@ type queryParamStub struct {
 	paths []string
 }
 
-type ExecutionHistoryResultEntryStub struct {
-	Result string `json:"result"`
-	Logs   string `json:"logs"`
-}
-
 type ExecutionHistoryEntryStub struct {
-	Start   time.Time                       `json:"start"`
-	End     time.Time                       `json:"end"`
-	TestRun bool                            `json:"testRun"`
-	Result  ExecutionHistoryResultEntryStub `json:"entries"`
+	WorkerKey        string `json:"workerKey"`
+	WorkerType       string `json:"workerType"`
+	WorkerProjectKey string `json:"workerProjectKey"`
+	ExecutionStatus  string `json:"executionStatus"`
+	StartTimeMillis  int64  `json:"startTimeMillis"`
+	EndTimeMillis    int64  `json:"endTimeMillis"`
+	TriggeredBy      string `json:"triggeredBy"`
+	TestRun          bool   `json:"testRun"`
+	ExecutedVersion  string `json:"executedVersion"`
+	TraceID          string `json:"traceId"`
 }
 
 type ExecutionHistoryStub []*ExecutionHistoryEntryStub
