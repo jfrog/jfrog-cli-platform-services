@@ -3,7 +3,9 @@ package commands
 import (
 	"fmt"
 	"net/http"
+	"slices"
 
+	"github.com/jfrog/jfrog-cli-core/v2/common/format"
 	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 
 	plugins_common "github.com/jfrog/jfrog-cli-core/v2/plugins/common"
@@ -15,9 +17,10 @@ import (
 
 func GetRemoveCommand() components.Command {
 	return components.Command{
-		Name:        "undeploy",
-		Description: "Undeploy a worker",
-		Aliases:     []string{"rm"},
+		Name:             "undeploy",
+		Description:      "Undeploy a worker",
+		Aliases:          []string{"rm"},
+		SupportedFormats: []format.OutputFormat{format.Json},
 		Flags: []components.Flag{
 			plugins_common.GetServerIdFlag(),
 			model.GetTimeoutFlag(),
@@ -40,18 +43,33 @@ func runRemoveCommand(c *components.Context) error {
 		return err
 	}
 
+	var responseStatus int
+	var contentHandler common.APIContentHandler
+	if slices.Contains(c.FlagsUsed, format.FlagName) {
+		if _, fmtErr := c.GetOutputFormat(); fmtErr != nil {
+			return fmtErr
+		}
+		contentHandler = func(body []byte) error {
+			return common.PrintJSONOrStatus(responseStatus, body)
+		}
+	}
+
 	log.Info(fmt.Sprintf("Removing worker '%s' ...", workerKey))
 
 	err = common.CallWorkerAPI(c, common.APICallParams{
-		Method:      http.MethodDelete,
-		ServerURL:   server.GetUrl(),
-		ServerToken: server.GetAccessToken(),
-		OkStatuses:  []int{http.StatusNoContent},
-		Path:        []string{"workers", workerKey},
+		Method:        http.MethodDelete,
+		ServerURL:     server.GetUrl(),
+		ServerToken:   server.GetAccessToken(),
+		OkStatuses:    []int{http.StatusNoContent},
+		Path:          []string{"workers", workerKey},
+		OnContent:     contentHandler,
+		CaptureStatus: &responseStatus,
 	})
-	if err == nil {
-		log.Info(fmt.Sprintf("Worker '%s' removed", workerKey))
+	if err != nil {
+		return err
 	}
 
-	return err
+	log.Info(fmt.Sprintf("Worker '%s' removed", workerKey))
+
+	return nil
 }

@@ -7,10 +7,12 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
-
+	"github.com/jfrog/jfrog-cli-core/v2/common/format"
 	plugins_common "github.com/jfrog/jfrog-cli-core/v2/plugins/common"
 	"github.com/jfrog/jfrog-cli-core/v2/plugins/components"
+	"github.com/jfrog/jfrog-client-go/utils/log"
+
+	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 	"github.com/jfrog/jfrog-cli-platform-services/model"
 )
 
@@ -20,12 +22,14 @@ type getAllResponse struct {
 
 func GetListCommand() components.Command {
 	return components.Command{
-		Name:        "list",
-		Description: "List workers. The default output is a CSV format with columns <name>,<action>,<description>,<enabled>.",
-		Aliases:     []string{"ls"},
+		Name:             "list",
+		Description:      "List workers. The default output is a CSV format with columns <name>,<action>,<description>,<enabled>.",
+		Aliases:          []string{"ls"},
+		SupportedFormats: []format.OutputFormat{format.Json, format.Table},
+		DefaultFormat:    format.Table,
 		Flags: []components.Flag{
 			plugins_common.GetServerIdFlag(),
-			model.GetJSONOutputFlag("Use JSON instead of CSV as output"),
+			model.GetJSONOutputFlag("Deprecated: use --format json instead."),
 			model.GetTimeoutFlag(),
 			model.GetProjectKeyFlag(),
 		},
@@ -58,9 +62,21 @@ func runListCommand(ctx *components.Context, serverURL string, token string) err
 		params["action"] = action
 	}
 
-	contentHandler := printWorkerDetailsAsCsv
+	outputFormat, err := ctx.GetOutputFormat()
+	if err != nil {
+		return err
+	}
 	if ctx.GetBoolFlagValue(model.FlagJSONOutput) {
+		log.Warn("--json is deprecated, use --format json instead.")
+		outputFormat = format.Json
+	}
+
+	var contentHandler func([]byte) error
+	switch outputFormat {
+	case format.Json:
 		contentHandler = common.PrintJSON
+	case format.Table:
+		contentHandler = printWorkerDetailsAsCsv
 	}
 
 	return common.CallWorkerAPI(ctx, common.APICallParams{

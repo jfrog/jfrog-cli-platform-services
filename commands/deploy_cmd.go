@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 
+	"github.com/jfrog/jfrog-cli-core/v2/common/format"
 	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 
 	plugins_common "github.com/jfrog/jfrog-cli-core/v2/plugins/common"
@@ -28,11 +30,23 @@ type deployRequest struct {
 	Version        *model.Version        `json:"version,omitempty"`
 }
 
+type deployCommandHandler struct {
+	ctx                      *components.Context
+	manifest                 *model.Manifest
+	actionMeta               *model.ActionMetadata
+	version                  *model.Version
+	serverURL                string
+	token                    string
+	encodeSourceCodeInBase64 bool
+	outputFormat             format.OutputFormat
+}
+
 func GetDeployCommand() components.Command {
 	return components.Command{
-		Name:        "deploy",
-		Description: "Deploy a worker",
-		Aliases:     []string{"d"},
+		Name:             "deploy",
+		Description:      "Deploy a worker",
+		Aliases:          []string{"d"},
+		SupportedFormats: []format.OutputFormat{format.Json},
 		Flags: []components.Flag{
 			plugins_common.GetServerIdFlag(),
 			model.GetTimeoutFlag(),
@@ -43,6 +57,15 @@ func GetDeployCommand() components.Command {
 			model.GetBase64Flag(),
 		},
 		Action: func(c *components.Context) error {
+			var outputFormat format.OutputFormat
+			if slices.Contains(c.FlagsUsed, format.FlagName) {
+				var fmtErr error
+				outputFormat, fmtErr = c.GetOutputFormat()
+				if fmtErr != nil {
+					return fmtErr
+				}
+			}
+
 			server, err := model.GetServerDetails(c)
 			if err != nil {
 				return err
@@ -102,18 +125,28 @@ func GetDeployCommand() components.Command {
 			} else {
 				encodeSourceCodeInBase64 = *options.ShouldEncodeSourceCodeInBase64 || c.GetBoolFlagValue(model.FlagBase64)
 			}
-			return runDeployCommand(c, manifest, actionMeta, version, server.GetUrl(), server.GetAccessToken(), encodeSourceCodeInBase64)
+
+			return (&deployCommandHandler{
+				ctx:                      c,
+				manifest:                 manifest,
+				actionMeta:               actionMeta,
+				version:                  version,
+				serverURL:                server.GetUrl(),
+				token:                    server.GetAccessToken(),
+				encodeSourceCodeInBase64: encodeSourceCodeInBase64,
+				outputFormat:             outputFormat,
+			}).run()
 		},
 	}
 }
 
-func runDeployCommand(ctx *components.Context, manifest *model.Manifest, actionMeta *model.ActionMetadata, version *model.Version, serverURL string, token string, encodeSourceCodeInBase64 bool) error {
-	existingWorker, err := common.FetchWorkerDetails(ctx, serverURL, token, manifest.Name, manifest.ProjectKey)
+func (h *deployCommandHandler) run() error {
+	existingWorker, err := common.FetchWorkerDetails(h.ctx, h.serverURL, h.token, h.manifest.Name, h.manifest.ProjectKey)
 	if err != nil {
 		return err
 	}
 
-	body, err := prepareDeployRequest(ctx, manifest, actionMeta, version, existingWorker, encodeSourceCodeInBase64)
+	body, err := h.prepareRequest(existingWorker)
 	if err != nil {
 		return err
 	}
@@ -123,70 +156,81 @@ func runDeployCommand(ctx *components.Context, manifest *model.Manifest, actionM
 		return err
 	}
 
-	if existingWorker == nil {
-		log.Info(fmt.Sprintf("Deploying worker '%s'", manifest.Name))
-		err = common.CallWorkerAPI(ctx, common.APICallParams{
-			Method:      http.MethodPost,
-			ServerURL:   serverURL,
-			ServerToken: token,
-			Body:        bodyBytes,
-			OkStatuses:  []int{http.StatusCreated},
-			Path:        []string{"workers"},
-			APIVersion:  common.APIVersionV2,
-		})
-		if err == nil {
-			log.Info(fmt.Sprintf("Worker '%s' deployed", manifest.Name))
+	var responseStatus int
+	var contentHandler common.APIContentHandler
+	if h.outputFormat != format.None {
+		contentHandler = func(body []byte) error {
+			return common.PrintJSONOrStatus(responseStatus, body)
 		}
-		return err
 	}
 
-	log.Info(fmt.Sprintf("Updating worker '%s'", manifest.Name))
-	err = common.CallWorkerAPI(ctx, common.APICallParams{
-		Method:      http.MethodPut,
-		ServerURL:   serverURL,
-		ServerToken: token,
-		Body:        bodyBytes,
-		OkStatuses:  []int{http.StatusNoContent},
-		Path:        []string{"workers"},
-		APIVersion:  common.APIVersionV2,
-	})
-	if err == nil {
-		log.Info(fmt.Sprintf("Worker '%s' updated", manifest.Name))
+	if existingWorker == nil {
+		log.Info(fmt.Sprintf("Deploying worker '%s'", h.manifest.Name))
+		err = common.CallWorkerAPI(h.ctx, common.APICallParams{
+			Method:        http.MethodPost,
+			ServerURL:     h.serverURL,
+			ServerToken:   h.token,
+			Body:          bodyBytes,
+			OkStatuses:    []int{http.StatusCreated},
+			Path:          []string{"workers"},
+			APIVersion:    common.APIVersionV2,
+			OnContent:     contentHandler,
+			CaptureStatus: &responseStatus,
+		})
+		if err == nil {
+			log.Info(fmt.Sprintf("Worker '%s' deployed", h.manifest.Name))
+		}
+	} else {
+		log.Info(fmt.Sprintf("Updating worker '%s'", h.manifest.Name))
+		err = common.CallWorkerAPI(h.ctx, common.APICallParams{
+			Method:        http.MethodPut,
+			ServerURL:     h.serverURL,
+			ServerToken:   h.token,
+			Body:          bodyBytes,
+			OkStatuses:    []int{http.StatusNoContent},
+			Path:          []string{"workers"},
+			APIVersion:    common.APIVersionV2,
+			OnContent:     contentHandler,
+			CaptureStatus: &responseStatus,
+		})
+		if err == nil {
+			log.Info(fmt.Sprintf("Worker '%s' updated", h.manifest.Name))
+		}
 	}
 
 	return err
 }
 
-func prepareDeployRequest(ctx *components.Context, manifest *model.Manifest, actionMeta *model.ActionMetadata, version *model.Version, existingWorker *model.WorkerDetails, encodeSourceCodeInBase64 bool) (*deployRequest, error) {
-	sourceCode, err := common.ReadSourceCode(manifest)
+func (h *deployCommandHandler) prepareRequest(existingWorker *model.WorkerDetails) (*deployRequest, error) {
+	sourceCode, err := common.ReadSourceCode(h.manifest)
 	if err != nil {
 		return nil, err
 	}
 	sourceCode = common.CleanImports(sourceCode)
 
-	if encodeSourceCodeInBase64 {
+	if h.encodeSourceCodeInBase64 {
 		sourceCode = "base64:" + base64.StdEncoding.EncodeToString([]byte(sourceCode))
 	}
 
 	var secrets []*model.Secret
-
-	if !ctx.GetBoolFlagValue(model.FlagNoSecrets) {
-		secrets = common.PrepareSecretsUpdate(manifest, existingWorker)
+	if !h.ctx.GetBoolFlagValue(model.FlagNoSecrets) {
+		secrets = common.PrepareSecretsUpdate(h.manifest, existingWorker)
 	}
+
 	payload := &deployRequest{
-		Key:         manifest.Name,
-		Action:      actionMeta.Action,
-		Description: manifest.Description,
-		Enabled:     manifest.Enabled,
-		Debug:       manifest.Debug,
+		Key:         h.manifest.Name,
+		Action:      h.actionMeta.Action,
+		Description: h.manifest.Description,
+		Enabled:     h.manifest.Enabled,
+		Debug:       h.manifest.Debug,
 		SourceCode:  sourceCode,
 		Secrets:     secrets,
-		ProjectKey:  manifest.ProjectKey,
-		Version:     version,
+		ProjectKey:  h.manifest.ProjectKey,
+		Version:     h.version,
 	}
 
-	if actionMeta.MandatoryFilter {
-		payload.FilterCriteria = manifest.FilterCriteria
+	if h.actionMeta.MandatoryFilter {
+		payload.FilterCriteria = h.manifest.FilterCriteria
 	}
 	return payload, nil
 }

@@ -2,8 +2,10 @@ package commands
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
+	"github.com/jfrog/jfrog-cli-core/v2/common/format"
 	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 
 	"github.com/jfrog/jfrog-client-go/utils/log"
@@ -16,9 +18,11 @@ import (
 
 func GetExecuteCommand() components.Command {
 	return components.Command{
-		Name:        "execute",
-		Description: "Execute a GENERIC_EVENT worker",
-		Aliases:     []string{"exec", "e"},
+		Name:             "execute",
+		Description:      "Execute a GENERIC_EVENT worker",
+		Aliases:          []string{"exec", "e"},
+		SupportedFormats: []format.OutputFormat{format.Json, format.Table},
+		DefaultFormat:    format.Json,
 		Flags: []components.Flag{
 			plugins_common.GetServerIdFlag(),
 			model.GetTimeoutFlag(),
@@ -33,6 +37,19 @@ func GetExecuteCommand() components.Command {
 }
 
 func runExecuteCommand(c *components.Context) error {
+	outputFormat, err := c.GetOutputFormat()
+	if err != nil {
+		return err
+	}
+
+	var contentHandler func([]byte) error
+	switch outputFormat {
+	case format.Json:
+		contentHandler = common.PrintJSON
+	case format.Table:
+		contentHandler = printExecuteResponseAsTable
+	}
+
 	workerKey, projectKey, err := common.ExtractProjectAndKeyFromCommandContext(c, c.Arguments, 1, true)
 	if err != nil {
 		return err
@@ -67,6 +84,22 @@ func runExecuteCommand(c *components.Context) error {
 		Body:        body,
 		ProjectKey:  projectKey,
 		Path:        []string{"execute", workerKey},
-		OnContent:   common.PrintJSON,
+		OnContent:   contentHandler,
 	})
+}
+
+func printExecuteResponseAsTable(responseBytes []byte) error {
+	var data map[string]any
+	if err := json.Unmarshal(responseBytes, &data); err != nil {
+		return common.PrintJSON(responseBytes)
+	}
+
+	writer := common.NewCsvWriter()
+	for k, v := range data {
+		if err := writer.Write([]string{k, fmt.Sprint(v)}); err != nil {
+			return err
+		}
+	}
+	writer.Flush()
+	return writer.Error()
 }

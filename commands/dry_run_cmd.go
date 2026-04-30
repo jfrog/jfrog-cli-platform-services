@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/jfrog/jfrog-cli-core/v2/common/format"
 	"github.com/jfrog/jfrog-cli-platform-services/commands/common"
 
 	"github.com/jfrog/jfrog-client-go/utils/log"
@@ -28,9 +29,11 @@ type dryRunRequest struct {
 
 func GetDryRunCommand() components.Command {
 	return components.Command{
-		Name:        "test-run",
-		Description: "Dry run a worker",
-		Aliases:     []string{"dry-run", "dr", "tr"},
+		Name:             "test-run",
+		Description:      "Dry run a worker",
+		Aliases:          []string{"dry-run", "dr", "tr"},
+		SupportedFormats: []format.OutputFormat{format.Json, format.Table},
+		DefaultFormat:    format.Json,
 		Flags: []components.Flag{
 			plugins_common.GetServerIdFlag(),
 			model.GetTimeoutFlag(),
@@ -40,6 +43,11 @@ func GetDryRunCommand() components.Command {
 			model.GetJSONPayloadArgument(),
 		},
 		Action: func(c *components.Context) error {
+			outputFormat, err := c.GetOutputFormat()
+			if err != nil {
+				return err
+			}
+
 			h := &dryRunHandler{c}
 
 			manifest, err := common.ReadManifest()
@@ -74,16 +82,25 @@ func GetDryRunCommand() components.Command {
 				}
 			}
 
-			return h.run(manifest, server.GetUrl(), server.GetAccessToken(), data)
+			return h.run(manifest, server.GetUrl(), server.GetAccessToken(), data, outputFormat)
 		},
 	}
 }
 
-func (c *dryRunHandler) run(manifest *model.Manifest, serverURL string, token string, data map[string]any) error {
+func (c *dryRunHandler) run(manifest *model.Manifest, serverURL string, token string, data map[string]any, outputFormat format.OutputFormat) error {
 	body, err := c.preparePayload(manifest, serverURL, token, data)
 	if err != nil {
 		return err
 	}
+
+	var contentHandler func([]byte) error
+	switch outputFormat {
+	case format.Json:
+		contentHandler = common.PrintJSON
+	case format.Table:
+		contentHandler = printDryRunResponseAsTable
+	}
+
 	return common.CallWorkerAPI(c.ctx, common.APICallParams{
 		Method:      http.MethodPost,
 		ServerURL:   serverURL,
@@ -95,8 +112,24 @@ func (c *dryRunHandler) run(manifest *model.Manifest, serverURL string, token st
 		},
 		OkStatuses: []int{http.StatusOK},
 		Path:       []string{"test", manifest.Name},
-		OnContent:  common.PrintJSON,
+		OnContent:  contentHandler,
 	})
+}
+
+func printDryRunResponseAsTable(responseBytes []byte) error {
+	var data map[string]any
+	if err := json.Unmarshal(responseBytes, &data); err != nil {
+		return common.PrintJSON(responseBytes)
+	}
+
+	writer := common.NewCsvWriter()
+	for k, v := range data {
+		if err := writer.Write([]string{k, fmt.Sprint(v)}); err != nil {
+			return err
+		}
+	}
+	writer.Flush()
+	return writer.Error()
 }
 
 func (c *dryRunHandler) preparePayload(manifest *model.Manifest, serverURL string, token string, data map[string]any) ([]byte, error) {
