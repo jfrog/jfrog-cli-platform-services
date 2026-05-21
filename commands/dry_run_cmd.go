@@ -31,6 +31,32 @@ func GetDryRunCommand() components.Command {
 	return components.Command{
 		Name:             "test-run",
 		Description:      "Dry run a worker",
+		AIDescription: `Send the local worker source code to the platform's sandbox and execute it against a sample payload without deploying. Use this to iterate on logic before 'jf worker deploy'.
+
+When to use:
+- Validating new or modified worker.ts logic against a realistic payload.
+- Reproducing a failure without touching the deployed worker.
+- Smoke-testing secret handling before promoting changes.
+
+Prerequisites:
+- A valid manifest.json and worker.ts in the current directory (run 'jf worker init' first).
+- Configured server (jf c add or jf login).
+- The action declared in manifest.json must be supported by the target server.
+
+Common patterns:
+  $ jf worker test-run '{"repoPath":"my-repo/path/to/artifact"}'
+  $ jf worker test-run @./sample-payload.json
+  $ jf worker test-run @- < sample-payload.json
+  $ jf worker test-run --no-secrets '{}'
+  $ jf worker test-run --format table '{}'
+
+Gotchas:
+- The payload argument is required and must match what the action delivers at runtime; check types.ts for the expected shape.
+- Use '@filename' to load the payload from a file and '@-' to read it from stdin.
+- By default, secrets in manifest.json are decrypted and sent as staged secrets; pass --no-secrets to omit them.
+- The 'debug' flag in manifest.json controls whether debug logs are returned by the sandbox.
+
+Related: jf worker deploy, jf worker execute, jf worker init`,
 		Aliases:          []string{"dry-run", "dr", "tr"},
 		SupportedFormats: []format.OutputFormat{format.Json, format.Table},
 		DefaultFormat:    format.Json,

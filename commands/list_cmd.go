@@ -24,6 +24,30 @@ func GetListCommand() components.Command {
 	return components.Command{
 		Name:             "list",
 		Description:      "List workers. The default output is a CSV format with columns <name>,<action>,<description>,<enabled>.",
+		AIDescription: `List workers deployed on the JFrog Platform, optionally filtered by action type. Default output is CSV (name, action, description, enabled); JSON output includes full worker details.
+
+When to use:
+- Discovering existing workers before deploying a new one (to avoid name collisions).
+- Auditing which workers are enabled in an environment.
+- Finding the exact worker key to pass to 'jf worker execute' or 'jf worker undeploy'.
+
+Prerequisites:
+- Configured server (jf c add or jf login) with read permission on the worker registry.
+- For project-scoped workers, pass --project (or list global workers without it).
+
+Common patterns:
+  $ jf worker list
+  $ jf worker list BEFORE_UPLOAD
+  $ jf worker list --project my-project
+  $ jf worker list --format json
+  $ jf worker list GENERIC_EVENT --format json
+
+Gotchas:
+- Without --project, only globally scoped workers are returned; project workers are listed separately per project.
+- The deprecated --json flag still works but emits a warning; prefer --format json.
+- The 'action' argument is case-sensitive and must match a name returned by 'jf worker list-event'.
+
+Related: jf worker list-event, jf worker execute, jf worker undeploy`,
 		Aliases:          []string{"ls"},
 		SupportedFormats: []format.OutputFormat{format.Json, format.Table},
 		DefaultFormat:    format.Table,
