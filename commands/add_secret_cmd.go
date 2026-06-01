@@ -23,7 +23,29 @@ func GetAddSecretCommand() components.Command {
 	return components.Command{
 		Name:        "add-secret",
 		Description: "Add a secret to a worker",
-		Aliases:     []string{"as"},
+		AIDescription: `Add or update an encrypted secret in the local manifest.json. The secret value is encrypted with a user-supplied password and stored under manifest.secrets; the plaintext value never leaves the machine until 'jf worker deploy' (or 'jf worker test-run') unwraps it for transmission over TLS.
+
+When to use:
+- Storing an API token, password, or other sensitive value for a worker.
+- Rotating an existing secret (with --edit).
+
+Prerequisites:
+- A valid manifest.json in the current directory.
+- The same encryption password used by any previously added secret in this manifest (all secrets share one password).
+- The secret value, either entered interactively or supplied via JFROG_WORKER_CLI_DEV_ADD_SECRET_VALUE.
+
+Common patterns:
+  $ jf worker add-secret api-token
+  $ jf worker add-secret api-token --edit
+  $ JFROG_WORKER_CLI_DEV_ADD_SECRET_VALUE=xyz jf worker add-secret api-token   # non-interactive
+
+Gotchas:
+- Without --edit, the command fails if a secret with the same name already exists.
+- The encryption password is prompted interactively; reuse the same one for every secret in a given manifest or decryption will fail at deploy time.
+- This command does NOT call the server; it only writes manifest.json. Run 'jf worker deploy' afterwards to push the secret.
+
+Related: jf worker deploy, jf worker test-run`,
+		Aliases: []string{"as"},
 		Flags: []components.Flag{
 			components.NewBoolFlag(model.FlagEdit, "Whether to update an existing secret.", components.WithBoolDefaultValue(false)),
 		},

@@ -43,8 +43,34 @@ type deployCommandHandler struct {
 
 func GetDeployCommand() components.Command {
 	return components.Command{
-		Name:             "deploy",
-		Description:      "Deploy a worker",
+		Name:        "deploy",
+		Description: "Deploy a worker",
+		AIDescription: `Create or update a worker on the JFrog Platform from the local manifest.json and worker.ts. The command auto-detects whether the worker already exists and issues a POST (create) or PUT (update) accordingly.
+
+When to use:
+- Publishing a new worker after 'jf worker init' and local testing.
+- Pushing updates to an already-deployed worker.
+- Recording a version (number, description, commit SHA) alongside the deployment.
+
+Prerequisites:
+- A valid manifest.json and worker.ts in the current directory.
+- Configured server (jf c add or jf login) with permission to manage workers in the target scope (project or platform).
+- For SCHEDULED_EVENT workers, manifest.json must include a valid filterCriteria.schedule (see 'jf worker edit-schedule').
+
+Common patterns:
+  $ jf worker deploy
+  $ jf worker deploy --no-secrets
+  $ jf worker deploy --version 1.2.3 --description "Add filter" --commit-sha abc1234
+  $ jf worker deploy --base64
+  $ jf worker deploy --format json
+
+Gotchas:
+- Secrets in manifest.json are decrypted locally and sent in plaintext over TLS unless --no-secrets is set.
+- Filter criteria are only sent when the action requires them (e.g. BEFORE_UPLOAD with a repo filter, SCHEDULED_EVENT with a cron).
+- The --base64 flag is ignored by servers that do not support base64-encoded source code.
+- Versioning fields are only validated against the server's version policy when at least one of --version / --description / --commit-sha is set.
+
+Related: jf worker test-run, jf worker undeploy, jf worker list, jf worker edit-schedule`,
 		Aliases:          []string{"d"},
 		SupportedFormats: []format.OutputFormat{format.Json},
 		Flags: []components.Flag{

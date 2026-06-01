@@ -25,7 +25,29 @@ func GetInitCommand() components.Command {
 	return components.Command{
 		Name:        "init",
 		Description: "Initialize a worker",
-		Aliases:     []string{"i"},
+		AIDescription: `Scaffold a new worker project in the current working directory. Generates manifest.json, worker.ts, package.json, tsconfig.json, types.ts, and (unless --no-test) worker.spec.ts based on the action's metadata fetched from the server.
+
+When to use:
+- Starting a new worker locally before editing TypeScript and deploying.
+- Regenerating boilerplate after picking a different action type.
+
+Prerequisites:
+- Configured server (jf c add or jf login) — the server is queried to discover available actions and their TypeScript types.
+- The 'action' must be a valid action name; run 'jf worker list-event' to list them.
+- Run the command from an empty (or expendable) directory; existing files are not overwritten unless --force is set.
+
+Common patterns:
+  $ jf worker init BEFORE_DOWNLOAD my-worker
+  $ jf worker init GENERIC_EVENT my-worker --no-test
+  $ jf worker init SCHEDULED_EVENT nightly-cleanup --project my-project --force
+
+Gotchas:
+- Files are written to the current directory, not a subdirectory named after the worker.
+- Without --force, the command aborts if any target file already exists.
+- The action name is case-sensitive and must match exactly (e.g. BEFORE_UPLOAD, not before_upload).
+
+Related: jf worker list-event, jf worker deploy, jf worker test-run`,
+		Aliases: []string{"i"},
 		Flags: []components.Flag{
 			plugins_common.GetServerIdFlag(),
 			model.GetProjectKeyFlag(),
