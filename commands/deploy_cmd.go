@@ -43,8 +43,8 @@ type deployCommandHandler struct {
 
 func GetDeployCommand() components.Command {
 	return components.Command{
-		Name:             "deploy",
-		Description:      "Deploy a worker",
+		Name:        "deploy",
+		Description: "Deploy a worker",
 		AIDescription: `Create or update a worker on the JFrog Platform from the local manifest.json and worker.ts. The command auto-detects whether the worker already exists and issues a POST (create) or PUT (update) accordingly.
 
 When to use:

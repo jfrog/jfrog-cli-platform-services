@@ -28,12 +28,12 @@ type executionHistoryEntry struct {
 
 func GetShowExecutionHistoryCommand() components.Command {
 	return components.Command{
-		Name:             "execution-history",
-		Description:      "Show a worker execution history.",
+		Name:        "execution-history",
+		Description: "Show a worker execution history.",
 		AIDescription: `Fetch the recent execution history of a deployed worker. Each entry includes start/end times, status, who triggered it, the executed version, and a trace ID for cross-referencing platform logs.
 
 When to use:
-- Investigating why a scheduled or event-driven worker failed.
+- Investigating why a scheduled, event-driven, or HTTP-triggered worker failed.
 - Confirming that a newly deployed worker is running on the expected schedule.
 - Correlating worker activity with platform audit logs via trace ID.
 

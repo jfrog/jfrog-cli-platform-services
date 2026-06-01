@@ -29,8 +29,8 @@ type dryRunRequest struct {
 
 func GetDryRunCommand() components.Command {
 	return components.Command{
-		Name:             "test-run",
-		Description:      "Dry run a worker",
+		Name:        "test-run",
+		Description: "Dry run a worker",
 		AIDescription: `Send the local worker source code to the platform's sandbox and execute it against a sample payload without deploying. Use this to iterate on logic before 'jf worker deploy'.
 
 When to use:

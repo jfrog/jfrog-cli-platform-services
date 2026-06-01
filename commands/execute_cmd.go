@@ -18,8 +18,8 @@ import (
 
 func GetExecuteCommand() components.Command {
 	return components.Command{
-		Name:             "execute",
-		Description:      "Execute a GENERIC_EVENT worker",
+		Name:        "execute",
+		Description: "Execute a GENERIC_EVENT worker",
 		AIDescription: `Invoke a deployed GENERIC_EVENT worker on the server with a JSON payload. Unlike 'test-run', this runs the published version of the worker (including its server-side secrets) and is the supported way to trigger a worker on demand.
 
 When to use:

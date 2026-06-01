@@ -13,9 +13,9 @@ import (
 
 func GetListEventsCommand() components.Command {
 	return components.Command{
-		Name:             "list-event",
-		Description:      "List available events.",
-		AIDescription: `List the action / event types supported by the target server. Use this to discover the valid 'action' values for 'jf worker init' and 'jf worker list'.
+		Name:        "list-event",
+		Description: "List available events.",
+		AIDescription: `List the action / event types supported by the target server. Use this to discover the valid 'action' values for 'jf worker init' and 'jf worker list'. With --format json, the output also includes each action's TypeScript type definitions (the same types used to scaffold a worker).
 
 When to use:
 - Looking up the exact name of an action (e.g. BEFORE_UPLOAD, GENERIC_EVENT, SCHEDULED_EVENT) before scaffolding a worker.

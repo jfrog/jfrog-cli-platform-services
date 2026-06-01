@@ -25,7 +25,7 @@ func getWorkerNamespace() components.Namespace {
 			"Typical lifecycle: 'jf worker init' to scaffold, 'jf worker test-run' to dry-run locally, 'jf worker deploy' to publish, " +
 			"'jf worker execute' to invoke a GENERIC_EVENT worker, 'jf worker undeploy' to remove. " +
 			"All commands require a JFrog Platform server configured via 'jf c add' or 'jf login' (or the JFROG_WORKER_CLI_DEV_* env vars).",
-		Category:    category,
+		Category: category,
 		Commands: []components.Command{
 			commands.GetInitCommand(),
 			commands.GetDryRunCommand(),

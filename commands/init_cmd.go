@@ -47,7 +47,7 @@ Gotchas:
 - The action name is case-sensitive and must match exactly (e.g. BEFORE_UPLOAD, not before_upload).
 
 Related: jf worker list-event, jf worker deploy, jf worker test-run`,
-		Aliases:     []string{"i"},
+		Aliases: []string{"i"},
 		Flags: []components.Flag{
 			plugins_common.GetServerIdFlag(),
 			model.GetProjectKeyFlag(),

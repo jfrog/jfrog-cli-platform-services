@@ -45,7 +45,7 @@ Gotchas:
 - This command does NOT call the server; it only writes manifest.json. Run 'jf worker deploy' afterwards to push the secret.
 
 Related: jf worker deploy, jf worker test-run`,
-		Aliases:     []string{"as"},
+		Aliases: []string{"as"},
 		Flags: []components.Flag{
 			components.NewBoolFlag(model.FlagEdit, "Whether to update an existing secret.", components.WithBoolDefaultValue(false)),
 		},

@@ -22,8 +22,8 @@ type getAllResponse struct {
 
 func GetListCommand() components.Command {
 	return components.Command{
-		Name:             "list",
-		Description:      "List workers. The default output is a CSV format with columns <name>,<action>,<description>,<enabled>.",
+		Name:        "list",
+		Description: "List workers. The default output is a CSV format with columns <name>,<action>,<description>,<enabled>.",
 		AIDescription: `List workers deployed on the JFrog Platform, optionally filtered by action type. Default output is CSV (name, action, description, enabled); JSON output includes full worker details.
 
 When to use:

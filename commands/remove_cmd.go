@@ -17,8 +17,8 @@ import (
 
 func GetRemoveCommand() components.Command {
 	return components.Command{
-		Name:             "undeploy",
-		Description:      "Undeploy a worker",
+		Name:        "undeploy",
+		Description: "Undeploy a worker",
 		AIDescription: `Delete a deployed worker from the JFrog Platform. The worker stops handling events immediately; its source, secrets, and schedule are removed server-side. Local files (manifest.json, worker.ts) are not touched.
 
 When to use:

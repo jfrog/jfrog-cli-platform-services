@@ -43,11 +43,11 @@ Common patterns:
 
 Gotchas:
 - The command refuses to run if manifest.action is not SCHEDULED_EVENT.
-- Cron expressions must have exactly 5 fields (minute hour day month dow); 6-field (with seconds) expressions are rejected.
+- Cron expressions must have exactly 5 fields (minute hour day month dow); 6-field (with seconds) or less than 5 digits expressions are rejected.
 - The change is local only — nothing is sent to the server until 'jf worker deploy'.
 
 Related: jf worker deploy, jf worker init, jf worker list-event`,
-		Aliases:     []string{"es"},
+		Aliases: []string{"es"},
 		Flags: []components.Flag{
 			components.NewStringFlag(flagScheduleCron, "A standard cron expression with minutes resolution. Seconds resolution is not supported by Worker service.", components.SetMandatory()),
 			components.NewStringFlag(flagScheduleTimezone, "The timezone to use for scheduling.", components.WithStrDefaultValue("UTC")),
