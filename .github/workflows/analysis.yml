@@ -22,3 +22,6 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           version: latest
+
+      - name: Check AI help coverage
+        uses: jfrog/.github/actions/ai-help-coverage@main
