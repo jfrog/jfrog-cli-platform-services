@@ -87,3 +87,30 @@ func FetchOptions(c model.IntFlagProvider, serverURL string, accessToken string)
 	}
 	return metadata, nil
 }
+
+func FetchTsConfig(c model.IntFlagProvider, serverURL string, accessToken string) ([]byte, error) {
+	var content []byte
+
+	err := CallWorkerAPI(c, APICallParams{
+		Method:            http.MethodGet,
+		ServerURL:         serverURL,
+		ServerToken:       accessToken,
+		OkStatuses:        []int{http.StatusOK},
+		APIVersion:        APIVersionV1,
+		Path:              []string{"scaffold", "tsconfig"},
+		SuppressErrorBody: true,
+		OnContent: func(body []byte) error {
+			content = body
+			return nil
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if !json.Valid(content) {
+		return nil, fmt.Errorf("server returned an invalid tsconfig.json")
+	}
+
+	return content, nil
+}

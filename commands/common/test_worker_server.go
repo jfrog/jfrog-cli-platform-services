@@ -300,6 +300,17 @@ func (s *ServerStub) WithBase64OptionsEndpoint() *ServerStub {
 	return s.WithOptionsEndpoint()
 }
 
+func (s *ServerStub) WithTsConfigEndpoint(status int, body string) *ServerStub {
+	s.endpoints = append(s.endpoints,
+		mockhttp.NewServerEndpoint().
+			When(
+				mockhttp.Request().GET("/worker/api/v1/scaffold/tsconfig"),
+			).
+			HandleWith(s.handleGetTsConfig(status, body)),
+	)
+	return s
+}
+
 func (s *ServerStub) handleGetAll(res http.ResponseWriter, req *http.Request) {
 	s.applyDelay()
 
@@ -505,6 +516,23 @@ func (s *ServerStub) handleGetOptions(res http.ResponseWriter, req *http.Request
 	}
 	_, err := res.Write([]byte(MustJsonMarshal(s.test, options)))
 	require.NoError(s.test, err)
+}
+
+func (s *ServerStub) handleGetTsConfig(status int, body string) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		s.applyDelay()
+
+		if !s.validateToken(res, req) {
+			return
+		}
+
+		res.WriteHeader(status)
+
+		if body != "" {
+			_, err := res.Write([]byte(body))
+			require.NoError(s.test, err)
+		}
+	}
 }
 
 func (s *ServerStub) handle(status int, validateBody BodyValidator, responseBody any) http.HandlerFunc {

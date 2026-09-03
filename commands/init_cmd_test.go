@@ -5,6 +5,7 @@ package commands
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"path"
 	"regexp"
@@ -111,12 +112,24 @@ func TestInitWorker(t *testing.T) {
 			test: testGenerateWithOverwrite("package.json", false),
 		},
 		{
-			name: "overwrite tsconfig.json with force",
-			test: testGenerateWithOverwrite("tsconfig.json", true),
+			name: "skip tsconfig.json generation when it already exists and no force",
+			test: testSkipTsConfigWhenExists(false),
 		},
 		{
-			name: "dont overwrite tsconfig.json without force",
-			test: testGenerateWithOverwrite("tsconfig.json", false),
+			name: "regenerate tsconfig.json when it already exists and force is set",
+			test: testSkipTsConfigWhenExists(true),
+		},
+		{
+			name: "fetch tsconfig.json from the server",
+			stub: common.NewServerStub(t).WithDefaultActionsMetadataEndpoint().
+				WithTsConfigEndpoint(http.StatusOK, `{"compilerOptions":{"strict":true,"fromServer":true}}`),
+			test: testFetchTsConfigFromServer,
+		},
+		{
+			name: "force-overwrite tsconfig.json with server content",
+			stub: common.NewServerStub(t).WithDefaultActionsMetadataEndpoint().
+				WithTsConfigEndpoint(http.StatusOK, `{"compilerOptions":{"strict":true,"fromServer":true}}`),
+			test: testForceOverwriteTsConfigFromServer,
 		},
 	}
 	for _, tt := range tests {
@@ -169,6 +182,70 @@ func testGenerateWithOverwrite(fileName string, overwrite bool) func(t *testing.
 			assert.Regexp(t, fmt.Sprintf(`%s already exists in \S+/%s, please use '--force' to overwrite if you know what you are doing`, fileName, workerName), err.Error())
 		}
 	}
+}
+
+func testSkipTsConfigWhenExists(force bool) func(t *testing.T, runCommand runCommandFunc) {
+	return func(t *testing.T, runCommand runCommandFunc) {
+		dir, workerName := common.PrepareWorkerDirForTest(t)
+
+		tsconfigPath := path.Join(dir, "tsconfig.json")
+
+		f, err := os.OpenFile(tsconfigPath, os.O_CREATE|os.O_WRONLY, os.ModePerm)
+		require.NoError(t, err)
+		_, err = f.WriteString("dummy content")
+		require.NoError(t, err)
+		require.NoError(t, f.Close())
+
+		cmd := []string{"worker", "init"}
+		if force {
+			cmd = append(cmd, "--force")
+		}
+		cmd = append(cmd, "BEFORE_DOWNLOAD", workerName)
+
+		err = runCommand(cmd...)
+		require.NoError(t, err)
+
+		got, err := os.ReadFile(tsconfigPath)
+		require.NoError(t, err)
+
+		if force {
+			wantFallback, err := templates.ReadFile("templates/tsconfig.json_template")
+			require.NoError(t, err)
+			assert.Equal(t, string(wantFallback), string(got), "tsconfig.json should have been regenerated with the embedded fallback when --force is set and no tsconfig endpoint is stubbed")
+		} else {
+			assert.Equal(t, "dummy content", string(got), "tsconfig.json should have been left untouched without --force")
+		}
+	}
+}
+
+func testFetchTsConfigFromServer(t *testing.T, runCommand runCommandFunc) {
+	dir, workerName := common.PrepareWorkerDirForTest(t)
+
+	err := runCommand("worker", "init", "BEFORE_DOWNLOAD", workerName)
+	require.NoError(t, err)
+
+	got, err := os.ReadFile(path.Join(dir, "tsconfig.json"))
+	require.NoError(t, err)
+	assert.Equal(t, `{"compilerOptions":{"strict":true,"fromServer":true}}`, string(got))
+}
+
+func testForceOverwriteTsConfigFromServer(t *testing.T, runCommand runCommandFunc) {
+	dir, workerName := common.PrepareWorkerDirForTest(t)
+
+	tsconfigPath := path.Join(dir, "tsconfig.json")
+
+	f, err := os.OpenFile(tsconfigPath, os.O_CREATE|os.O_WRONLY, os.ModePerm)
+	require.NoError(t, err)
+	_, err = f.WriteString("dummy content")
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+
+	err = runCommand("worker", "init", "--force", "BEFORE_DOWNLOAD", workerName)
+	require.NoError(t, err)
+
+	got, err := os.ReadFile(tsconfigPath)
+	require.NoError(t, err)
+	assert.Equal(t, `{"compilerOptions":{"strict":true,"fromServer":true}}`, string(got))
 }
 
 func testGenerateAction(actionName string, withTests bool, runCommand runCommandFunc) func(t *testing.T) {
