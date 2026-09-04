@@ -115,8 +115,8 @@ func TestFetchOptions(t *testing.T) {
 	assert.Equal(t, got, samples)
 }
 
-func TestFetchTsConfig(t *testing.T) {
-	const validTsConfig = `{"compilerOptions":{"strict":true}}`
+func TestFetchTSConfig(t *testing.T) {
+	const validTSConfig = `{"compilerOptions":{"strict":true}}`
 
 	tests := []struct {
 		name    string
@@ -126,8 +126,8 @@ func TestFetchTsConfig(t *testing.T) {
 	}{
 		{
 			name: "success",
-			stub: NewServerStub(t).WithTsConfigEndpoint(http.StatusOK, validTsConfig),
-			want: []byte(validTsConfig),
+			stub: NewServerStub(t).WithTSConfigEndpoint(http.StatusOK, validTSConfig),
+			want: []byte(validTSConfig),
 		},
 		{
 			name:    "endpoint not found",
@@ -136,12 +136,12 @@ func TestFetchTsConfig(t *testing.T) {
 		},
 		{
 			name:    "server error",
-			stub:    NewServerStub(t).WithTsConfigEndpoint(http.StatusInternalServerError, ""),
+			stub:    NewServerStub(t).WithTSConfigEndpoint(http.StatusInternalServerError, ""),
 			wantErr: `command GET .+/worker/api/v1/scaffold/tsconfig returned an unexpected status code 500`,
 		},
 		{
 			name:    "invalid json body",
-			stub:    NewServerStub(t).WithTsConfigEndpoint(http.StatusOK, "not json"),
+			stub:    NewServerStub(t).WithTSConfigEndpoint(http.StatusOK, "not json"),
 			wantErr: `server returned an invalid tsconfig.json`,
 		},
 	}
@@ -150,7 +150,7 @@ func TestFetchTsConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			s, token := NewMockWorkerServer(t, tt.stub.WithT(t))
 
-			got, err := FetchTsConfig(IntFlagMap{}, s.BaseUrl(), token)
+			got, err := FetchTSConfig(IntFlagMap{}, s.BaseUrl(), token)
 
 			if tt.wantErr != "" {
 				require.Error(t, err)

@@ -88,7 +88,7 @@ func FetchOptions(c model.IntFlagProvider, serverURL string, accessToken string)
 	return metadata, nil
 }
 
-func FetchTsConfig(c model.IntFlagProvider, serverURL string, accessToken string) ([]byte, error) {
+func FetchTSConfig(c model.IntFlagProvider, serverURL string, accessToken string) ([]byte, error) {
 	var content []byte
 
 	err := CallWorkerAPI(c, APICallParams{

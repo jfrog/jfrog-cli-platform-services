@@ -113,23 +113,23 @@ func TestInitWorker(t *testing.T) {
 		},
 		{
 			name: "skip tsconfig.json generation when it already exists and no force",
-			test: testSkipTsConfigWhenExists(false),
+			test: testSkipTSConfigWhenExists(false),
 		},
 		{
 			name: "regenerate tsconfig.json when it already exists and force is set",
-			test: testSkipTsConfigWhenExists(true),
+			test: testSkipTSConfigWhenExists(true),
 		},
 		{
 			name: "fetch tsconfig.json from the server",
 			stub: common.NewServerStub(t).WithDefaultActionsMetadataEndpoint().
-				WithTsConfigEndpoint(http.StatusOK, `{"compilerOptions":{"strict":true,"fromServer":true}}`),
-			test: testFetchTsConfigFromServer,
+				WithTSConfigEndpoint(http.StatusOK, `{"compilerOptions":{"strict":true,"fromServer":true}}`),
+			test: testFetchTSConfigFromServer,
 		},
 		{
 			name: "force-overwrite tsconfig.json with server content",
 			stub: common.NewServerStub(t).WithDefaultActionsMetadataEndpoint().
-				WithTsConfigEndpoint(http.StatusOK, `{"compilerOptions":{"strict":true,"fromServer":true}}`),
-			test: testForceOverwriteTsConfigFromServer,
+				WithTSConfigEndpoint(http.StatusOK, `{"compilerOptions":{"strict":true,"fromServer":true}}`),
+			test: testForceOverwriteTSConfigFromServer,
 		},
 	}
 	for _, tt := range tests {
@@ -184,7 +184,7 @@ func testGenerateWithOverwrite(fileName string, overwrite bool) func(t *testing.
 	}
 }
 
-func testSkipTsConfigWhenExists(force bool) func(t *testing.T, runCommand runCommandFunc) {
+func testSkipTSConfigWhenExists(force bool) func(t *testing.T, runCommand runCommandFunc) {
 	return func(t *testing.T, runCommand runCommandFunc) {
 		dir, workerName := common.PrepareWorkerDirForTest(t)
 
@@ -218,7 +218,7 @@ func testSkipTsConfigWhenExists(force bool) func(t *testing.T, runCommand runCom
 	}
 }
 
-func testFetchTsConfigFromServer(t *testing.T, runCommand runCommandFunc) {
+func testFetchTSConfigFromServer(t *testing.T, runCommand runCommandFunc) {
 	dir, workerName := common.PrepareWorkerDirForTest(t)
 
 	err := runCommand("worker", "init", "BEFORE_DOWNLOAD", workerName)
@@ -229,7 +229,7 @@ func testFetchTsConfigFromServer(t *testing.T, runCommand runCommandFunc) {
 	assert.Equal(t, `{"compilerOptions":{"strict":true,"fromServer":true}}`, string(got))
 }
 
-func testForceOverwriteTsConfigFromServer(t *testing.T, runCommand runCommandFunc) {
+func testForceOverwriteTSConfigFromServer(t *testing.T, runCommand runCommandFunc) {
 	dir, workerName := common.PrepareWorkerDirForTest(t)
 
 	tsconfigPath := path.Join(dir, "tsconfig.json")
