@@ -43,7 +43,8 @@ Common patterns:
 
 Gotchas:
 - Files are written to the current directory, not a subdirectory named after the worker.
-- Without --force, the command aborts if any target file already exists.
+- Without --force, the command aborts if any target file already exists, except tsconfig.json, which is skipped (with a log message, not an error) if it already exists — use --force to regenerate it.
+- tsconfig.json is fetched from the configured server; if that endpoint isn't available yet (e.g. an older server) or the server returns something unusable, an embedded default is written instead.
 - The action name is case-sensitive and must match exactly (e.g. BEFORE_UPLOAD, not before_upload).
 
 Related: jf worker list-event, jf worker deploy, jf worker test-run`,
@@ -121,7 +122,7 @@ func (c *initHandler) initWorker(targetDir string, action string, workerName str
 		return err
 	}
 
-	if err := generate("tsconfig.json_template", "tsconfig.json"); err != nil {
+	if err := c.generateTSConfig(targetDir, server.Url, server.AccessToken, force); err != nil {
 		return err
 	}
 
@@ -154,6 +155,32 @@ func (c *initHandler) checkFileBeforeGenerate(filePath string, failIfExists bool
 		log.Warn(fmt.Sprintf("%s exists in %s. It will be overwritten", path.Base(filePath), path.Dir(filePath)))
 	}
 	return nil
+}
+
+func (c *initHandler) generateTSConfig(targetDir string, serverURL string, accessToken string, force bool) error {
+	tsconfigPath := path.Join(targetDir, "tsconfig.json")
+
+	if _, err := os.Stat(tsconfigPath); err == nil || !errors.Is(err, os.ErrNotExist) {
+		if !force {
+			log.Info(fmt.Sprintf("tsconfig.json already exists in %s, skipping generation", targetDir))
+			return nil
+		}
+		log.Warn(fmt.Sprintf("tsconfig.json exists in %s. It will be overwritten", targetDir))
+	}
+
+	content, err := common.FetchTSConfig(c.Context, serverURL, accessToken)
+	if err != nil {
+		log.Debug(fmt.Sprintf("Cannot fetch tsconfig.json from the server, using the embedded default instead: %+v", err))
+	}
+
+	if len(content) == 0 {
+		content, err = templates.ReadFile("templates/tsconfig.json_template")
+		if err != nil {
+			return err
+		}
+	}
+
+	return os.WriteFile(tsconfigPath, content, os.ModePerm)
 }
 
 func (c *initHandler) initGenerator(targetDir string, workerName string, projectKey string, force bool, skipTests bool, md *model.ActionMetadata) func(string, string) error {

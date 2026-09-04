@@ -4,6 +4,7 @@
 package common
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/jfrog/jfrog-cli-platform-services/model"
@@ -112,4 +113,54 @@ func TestFetchOptions(t *testing.T) {
 	got, err := FetchOptions(IntFlagMap{}, s.BaseUrl(), token)
 	require.NoError(t, err)
 	assert.Equal(t, got, samples)
+}
+
+func TestFetchTSConfig(t *testing.T) {
+	const validTSConfig = `{"compilerOptions":{"strict":true}}`
+
+	tests := []struct {
+		name    string
+		stub    *ServerStub
+		wantErr string
+		want    []byte
+	}{
+		{
+			name: "success",
+			stub: NewServerStub(t).WithTSConfigEndpoint(http.StatusOK, validTSConfig),
+			want: []byte(validTSConfig),
+		},
+		{
+			name:    "endpoint not found",
+			stub:    NewServerStub(t),
+			wantErr: `command GET .+/worker/api/v1/scaffold/tsconfig returned an unexpected status code 404`,
+		},
+		{
+			name:    "server error",
+			stub:    NewServerStub(t).WithTSConfigEndpoint(http.StatusInternalServerError, ""),
+			wantErr: `command GET .+/worker/api/v1/scaffold/tsconfig returned an unexpected status code 500`,
+		},
+		{
+			name:    "invalid json body",
+			stub:    NewServerStub(t).WithTSConfigEndpoint(http.StatusOK, "not json"),
+			wantErr: `server returned an invalid tsconfig.json`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s, token := NewMockWorkerServer(t, tt.stub.WithT(t))
+
+			got, err := FetchTSConfig(IntFlagMap{}, s.BaseUrl(), token)
+
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Regexp(t, tt.wantErr, err.Error())
+				assert.Nil(t, got)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
