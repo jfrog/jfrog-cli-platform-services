@@ -64,7 +64,7 @@ func FetchActions(c model.IntFlagProvider, serverURL string, accessToken string,
 	return metadata, nil
 }
 
-func FetchOptions(c model.IntFlagProvider, serverURL string, accessToken string) (*OptionsMetadata, error) {
+func FetchOptions(c model.IntFlagProvider, serverURL string, accessToken string, projectKey string) (*OptionsMetadata, error) {
 	metadata := new(OptionsMetadata)
 
 	err := CallWorkerAPI(c, APICallParams{
@@ -72,6 +72,7 @@ func FetchOptions(c model.IntFlagProvider, serverURL string, accessToken string)
 		ServerURL:   serverURL,
 		ServerToken: accessToken,
 		OkStatuses:  []int{http.StatusOK},
+		ProjectKey:  projectKey,
 		APIVersion:  APIVersionV1,
 		Path:        []string{"options"},
 		OnContent: func(content []byte) error {
@@ -88,7 +89,7 @@ func FetchOptions(c model.IntFlagProvider, serverURL string, accessToken string)
 	return metadata, nil
 }
 
-func FetchTSConfig(c model.IntFlagProvider, serverURL string, accessToken string) ([]byte, error) {
+func FetchTSConfig(c model.IntFlagProvider, serverURL string, accessToken string, projectKey string) ([]byte, error) {
 	var content []byte
 
 	err := CallWorkerAPI(c, APICallParams{
@@ -96,6 +97,7 @@ func FetchTSConfig(c model.IntFlagProvider, serverURL string, accessToken string
 		ServerURL:         serverURL,
 		ServerToken:       accessToken,
 		OkStatuses:        []int{http.StatusOK},
+		ProjectKey:        projectKey,
 		APIVersion:        APIVersionV1,
 		Path:              []string{"scaffold", "tsconfig"},
 		SuppressErrorBody: true,

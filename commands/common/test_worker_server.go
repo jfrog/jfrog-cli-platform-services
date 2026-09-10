@@ -507,6 +507,10 @@ func (s *ServerStub) handleGetOptions(res http.ResponseWriter, req *http.Request
 		return
 	}
 
+	if !s.validateProjectKey(res, req) {
+		return
+	}
+
 	res.WriteHeader(http.StatusOK)
 
 	options := LoadSampleOptions(s.test)
@@ -523,6 +527,10 @@ func (s *ServerStub) handleGetTSConfig(status int, body string) http.HandlerFunc
 		s.applyDelay()
 
 		if !s.validateToken(res, req) {
+			return
+		}
+
+		if !s.validateProjectKey(res, req) {
 			return
 		}
 

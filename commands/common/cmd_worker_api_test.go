@@ -109,24 +109,58 @@ func TestFetchActions(t *testing.T) {
 
 func TestFetchOptions(t *testing.T) {
 	samples := LoadSampleOptions(t)
-	s, token := NewMockWorkerServer(t, NewServerStub(t).WithOptionsEndpoint().WithT(t))
-	got, err := FetchOptions(IntFlagMap{}, s.BaseUrl(), token)
-	require.NoError(t, err)
-	assert.Equal(t, got, samples)
+
+	tests := []struct {
+		name       string
+		projectKey string
+		stub       *ServerStub
+	}{
+		{
+			name: "success",
+			stub: NewServerStub(t).WithOptionsEndpoint(),
+		},
+		{
+			name:       "propagate projectKey",
+			projectKey: "prj-1",
+			stub: NewServerStub(t).
+				WithOptionsEndpoint().
+				WithProjectKey("prj-1"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s, token := NewMockWorkerServer(t, tt.stub.WithT(t))
+
+			got, err := FetchOptions(IntFlagMap{}, s.BaseUrl(), token, tt.projectKey)
+
+			require.NoError(t, err)
+			assert.Equal(t, got, samples)
+		})
+	}
 }
 
 func TestFetchTSConfig(t *testing.T) {
 	const validTSConfig = `{"compilerOptions":{"strict":true}}`
 
 	tests := []struct {
-		name    string
-		stub    *ServerStub
-		wantErr string
-		want    []byte
+		name       string
+		projectKey string
+		stub       *ServerStub
+		wantErr    string
+		want       []byte
 	}{
 		{
 			name: "success",
 			stub: NewServerStub(t).WithTSConfigEndpoint(http.StatusOK, validTSConfig),
+			want: []byte(validTSConfig),
+		},
+		{
+			name:       "propagate projectKey",
+			projectKey: "prj-1",
+			stub: NewServerStub(t).
+				WithTSConfigEndpoint(http.StatusOK, validTSConfig).
+				WithProjectKey("prj-1"),
 			want: []byte(validTSConfig),
 		},
 		{
@@ -150,7 +184,7 @@ func TestFetchTSConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			s, token := NewMockWorkerServer(t, tt.stub.WithT(t))
 
-			got, err := FetchTSConfig(IntFlagMap{}, s.BaseUrl(), token)
+			got, err := FetchTSConfig(IntFlagMap{}, s.BaseUrl(), token, tt.projectKey)
 
 			if tt.wantErr != "" {
 				require.Error(t, err)

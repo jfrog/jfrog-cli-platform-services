@@ -122,7 +122,7 @@ func (c *initHandler) initWorker(targetDir string, action string, workerName str
 		return err
 	}
 
-	if err := c.generateTSConfig(targetDir, server.Url, server.AccessToken, force); err != nil {
+	if err := c.generateTSConfig(targetDir, server.Url, server.AccessToken, projectKey, force); err != nil {
 		return err
 	}
 
@@ -157,7 +157,7 @@ func (c *initHandler) checkFileBeforeGenerate(filePath string, failIfExists bool
 	return nil
 }
 
-func (c *initHandler) generateTSConfig(targetDir string, serverURL string, accessToken string, force bool) error {
+func (c *initHandler) generateTSConfig(targetDir string, serverURL string, accessToken string, projectKey string, force bool) error {
 	tsconfigPath := path.Join(targetDir, "tsconfig.json")
 
 	if _, err := os.Stat(tsconfigPath); err == nil || !errors.Is(err, os.ErrNotExist) {
@@ -168,7 +168,7 @@ func (c *initHandler) generateTSConfig(targetDir string, serverURL string, acces
 		log.Warn(fmt.Sprintf("tsconfig.json exists in %s. It will be overwritten", targetDir))
 	}
 
-	content, err := common.FetchTSConfig(c.Context, serverURL, accessToken)
+	content, err := common.FetchTSConfig(c.Context, serverURL, accessToken, projectKey)
 	if err != nil {
 		log.Debug(fmt.Sprintf("Cannot fetch tsconfig.json from the server, using the embedded default instead: %+v", err))
 	}
