@@ -132,7 +132,7 @@ Related: jf worker test-run, jf worker undeploy, jf worker list, jf worker edit-
 				CommitSha:   c.GetStringFlagValue(model.FlagChangesCommitSha),
 			}
 
-			options, err := common.FetchOptions(c, server.GetUrl(), server.GetAccessToken())
+			options, err := common.FetchOptions(c, server.GetUrl(), server.GetAccessToken(), manifest.ProjectKey)
 			if err != nil {
 				return err
 			}

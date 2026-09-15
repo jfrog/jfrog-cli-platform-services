@@ -64,7 +64,7 @@ func FetchActions(c model.IntFlagProvider, serverURL string, accessToken string,
 	return metadata, nil
 }
 
-func FetchOptions(c model.IntFlagProvider, serverURL string, accessToken string) (*OptionsMetadata, error) {
+func FetchOptions(c model.IntFlagProvider, serverURL string, accessToken string, projectKey string) (*OptionsMetadata, error) {
 	metadata := new(OptionsMetadata)
 
 	err := CallWorkerAPI(c, APICallParams{
@@ -72,6 +72,7 @@ func FetchOptions(c model.IntFlagProvider, serverURL string, accessToken string)
 		ServerURL:   serverURL,
 		ServerToken: accessToken,
 		OkStatuses:  []int{http.StatusOK},
+		ProjectKey:  projectKey,
 		APIVersion:  APIVersionV1,
 		Path:        []string{"options"},
 		OnContent: func(content []byte) error {
@@ -86,4 +87,32 @@ func FetchOptions(c model.IntFlagProvider, serverURL string, accessToken string)
 		return nil, fmt.Errorf("cannot fetch options: %w", err)
 	}
 	return metadata, nil
+}
+
+func FetchTSConfig(c model.IntFlagProvider, serverURL string, accessToken string, projectKey string) ([]byte, error) {
+	var content []byte
+
+	err := CallWorkerAPI(c, APICallParams{
+		Method:            http.MethodGet,
+		ServerURL:         serverURL,
+		ServerToken:       accessToken,
+		OkStatuses:        []int{http.StatusOK},
+		ProjectKey:        projectKey,
+		APIVersion:        APIVersionV1,
+		Path:              []string{"scaffold", "tsconfig"},
+		SuppressErrorBody: true,
+		OnContent: func(body []byte) error {
+			content = body
+			return nil
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if !json.Valid(content) {
+		return nil, fmt.Errorf("server returned an invalid tsconfig.json")
+	}
+
+	return content, nil
 }

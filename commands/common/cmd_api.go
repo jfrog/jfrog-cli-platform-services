@@ -43,17 +43,18 @@ func apiError(status int, message string, args ...any) *APIError {
 }
 
 type APICallParams struct {
-	Method        string
-	ServerURL     string
-	ServerToken   string
-	Body          []byte
-	Query         map[string]string
-	Path          []string
-	ProjectKey    string
-	APIVersion    apiVersion
-	OkStatuses    []int
-	OnContent     APIContentHandler
-	CaptureStatus *int
+	Method            string
+	ServerURL         string
+	ServerToken       string
+	Body              []byte
+	Query             map[string]string
+	Path              []string
+	ProjectKey        string
+	APIVersion        apiVersion
+	OkStatuses        []int
+	OnContent         APIContentHandler
+	CaptureStatus     *int
+	SuppressErrorBody bool
 }
 
 func CallWorkerAPI(c model.IntFlagProvider, params APICallParams) error {
@@ -109,8 +110,12 @@ func CallWorkerAPI(c model.IntFlagProvider, params APICallParams) error {
 	}
 
 	if slices.Index(params.OkStatuses, res.StatusCode) == -1 {
-		// We the response contains json content, we will print it
-		_ = processAPIResponse(res, printJSONOrLogError)
+		var onError APIContentHandler
+		if !params.SuppressErrorBody {
+			// We the response contains json content, we will print it
+			onError = printJSONOrLogError
+		}
+		_ = processAPIResponse(res, onError)
 		return apiError(res.StatusCode, "command %s %s returned an unexpected status code %d", params.Method, apiEndpoint, res.StatusCode)
 	}
 
