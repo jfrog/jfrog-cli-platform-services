@@ -45,6 +45,50 @@ func Test_cleanImports(t *testing.T) {
 	}
 }
 
+func TestPreparePropertiesUpdate(t *testing.T) {
+	tests := []struct {
+		name       string
+		properties map[string]string
+		existing   []*model.Property
+		want       []*model.Property
+	}{
+		{
+			name:       "adds local properties",
+			properties: map[string]string{"new": "value"},
+			want:       []*model.Property{{Key: "new", Value: "value"}},
+		},
+		{
+			name:       "replaces existing and removes remote-only properties",
+			properties: map[string]string{"changed": "new-value"},
+			existing: []*model.Property{
+				{Key: "changed", Value: "old-value"},
+				{Key: "remote-only", Value: "remote-value"},
+			},
+			want: []*model.Property{
+				{Key: "changed", MarkedForRemoval: true},
+				{Key: "changed", Value: "new-value"},
+				{Key: "remote-only", MarkedForRemoval: true},
+			},
+		},
+		{
+			name:       "empty map removes every remote property",
+			properties: map[string]string{},
+			existing:   []*model.Property{{Key: "remote", Value: "value"}},
+			want:       []*model.Property{{Key: "remote", MarkedForRemoval: true}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := PreparePropertiesUpdate(
+				&model.Manifest{Properties: tt.properties},
+				&model.WorkerDetails{Properties: tt.existing},
+			)
+			assert.ElementsMatch(t, tt.want, got)
+		})
+	}
+}
+
 func Test_extractProjectAndKeyFromCommandContext(t *testing.T) {
 	tests := []struct {
 		name         string

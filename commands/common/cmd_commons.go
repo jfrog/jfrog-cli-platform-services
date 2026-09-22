@@ -91,3 +91,27 @@ func PrepareSecretsUpdate(mf *model.Manifest, existingWorker *model.WorkerDetail
 
 	return secrets
 }
+
+func PreparePropertiesUpdate(mf *model.Manifest, existingWorker *model.WorkerDetails) []*model.Property {
+	removedProperties := map[string]any{}
+	if existingWorker != nil {
+		for _, existingProperty := range existingWorker.Properties {
+			removedProperties[existingProperty.Key] = struct{}{}
+		}
+	}
+
+	var properties []*model.Property
+	for propertyName, propertyValue := range mf.Properties {
+		if _, propertyExists := removedProperties[propertyName]; propertyExists {
+			properties = append(properties, &model.Property{Key: propertyName, MarkedForRemoval: true})
+		}
+		delete(removedProperties, propertyName)
+		properties = append(properties, &model.Property{Key: propertyName, Value: propertyValue})
+	}
+
+	for removedProperty := range removedProperties {
+		properties = append(properties, &model.Property{Key: removedProperty, MarkedForRemoval: true})
+	}
+
+	return properties
+}

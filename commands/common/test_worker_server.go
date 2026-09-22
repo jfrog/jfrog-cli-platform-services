@@ -35,6 +35,7 @@ type workerDeployPayload struct {
 	Action         model.Action          `json:"action"`
 	FilterCriteria *model.FilterCriteria `json:"filterCriteria,omitempty"`
 	Secrets        []*model.Secret       `json:"secrets"`
+	Properties     []*model.Property     `json:"properties,omitempty"`
 	ProjectKey     string                `json:"projectKey"`
 	Version        *model.Version        `json:"version,omitempty"`
 }
@@ -641,6 +642,7 @@ func mapWorkerSentToWorkerDetails(workerSent workerDeployPayload) *model.WorkerD
 		Action:         workerSent.Action.Name, // Map Action.Name
 		FilterCriteria: workerSent.FilterCriteria,
 		Secrets:        workerSent.Secrets,
+		Properties:     workerSent.Properties,
 		ProjectKey:     workerSent.ProjectKey,
 	}
 }

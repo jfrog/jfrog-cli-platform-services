@@ -30,10 +30,11 @@ const (
 )
 
 var (
-	EnvKeyServerURL       = "JFROG_WORKER_CLI_DEV_SERVER_URL"
-	EnvKeyAccessToken     = "JFROG_WORKER_CLI_DEV_ACCESS_TOKEN"
-	EnvKeySecretsPassword = "JFROG_WORKER_CLI_DEV_SECRETS_PASSWORD"
-	EnvKeyAddSecretValue  = "JFROG_WORKER_CLI_DEV_ADD_SECRET_VALUE"
+	EnvKeyServerURL        = "JFROG_WORKER_CLI_DEV_SERVER_URL"
+	EnvKeyAccessToken      = "JFROG_WORKER_CLI_DEV_ACCESS_TOKEN"
+	EnvKeySecretsPassword  = "JFROG_WORKER_CLI_DEV_SECRETS_PASSWORD"
+	EnvKeyAddSecretValue   = "JFROG_WORKER_CLI_DEV_ADD_SECRET_VALUE"
+	EnvKeyAddPropertyValue = "JFROG_WORKER_CLI_DEV_ADD_PROPERTY_VALUE"
 )
 
 type IntFlagProvider interface {

@@ -104,6 +104,41 @@ func TestReadManifest(t *testing.T) {
 	}
 }
 
+func TestReadManifestPreservesOmittedAndEmptyProperties(t *testing.T) {
+	tests := []struct {
+		name       string
+		properties string
+		assert     func(*testing.T, map[string]string)
+	}{
+		{
+			name: "omitted",
+			assert: func(t *testing.T, properties map[string]string) {
+				assert.Nil(t, properties)
+			},
+		},
+		{
+			name:       "empty",
+			properties: `,"properties":{}`,
+			assert: func(t *testing.T, properties map[string]string) {
+				assert.NotNil(t, properties)
+				assert.Empty(t, properties)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			manifest := `{"name":"worker","sourceCodePath":"worker.ts","action":"GENERIC_EVENT"` + tt.properties + `}`
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "manifest.json"), []byte(manifest), 0o600))
+
+			got, err := ReadManifest(dir)
+			require.NoError(t, err)
+			tt.assert(t, got.Properties)
+		})
+	}
+}
+
 func TestManifest_ReadSourceCode(t *testing.T) {
 	tests := []struct {
 		name       string
