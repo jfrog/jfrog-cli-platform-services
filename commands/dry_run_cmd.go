@@ -21,10 +21,11 @@ type dryRunHandler struct {
 }
 
 type dryRunRequest struct {
-	Code          string          `json:"code"`
-	Action        string          `json:"action"`
-	StagedSecrets []*model.Secret `json:"stagedSecrets,omitempty"`
-	Data          map[string]any  `json:"data"`
+	Code             string            `json:"code"`
+	Action           string            `json:"action"`
+	StagedSecrets    []*model.Secret   `json:"stagedSecrets,omitempty"`
+	StagedProperties []*model.Property `json:"stagedProperties,omitempty"`
+	Data             map[string]any    `json:"data"`
 }
 
 func GetDryRunCommand() components.Command {
@@ -54,6 +55,7 @@ Gotchas:
 - The payload argument is required and must match what the action delivers at runtime; check types.ts for the expected shape.
 - Use '@filename' to load the payload from a file and '@-' to read it from stdin.
 - By default, secrets in manifest.json are decrypted and sent as staged secrets; pass --no-secrets to omit them.
+- Properties are clear text, stored unencrypted in manifest.json, and sent over TLS; --no-secrets does not omit them.
 - The 'debug' flag in manifest.json controls whether debug logs are returned by the sandbox.
 
 Related: jf worker deploy, jf worker execute, jf worker init`,
@@ -176,6 +178,9 @@ func (c *dryRunHandler) preparePayload(manifest *model.Manifest, serverURL strin
 
 	if !c.ctx.GetBoolFlagValue(model.FlagNoSecrets) {
 		payload.StagedSecrets = common.PrepareSecretsUpdate(manifest, existingWorker)
+	}
+	if manifest.Properties != nil {
+		payload.StagedProperties = common.PreparePropertiesUpdate(manifest, existingWorker)
 	}
 
 	return json.Marshal(&payload)
