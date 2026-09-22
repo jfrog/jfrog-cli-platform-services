@@ -43,11 +43,15 @@ func TestDeployCommand(t *testing.T) {
 				WithGetOneEndpoint().
 				WithOptionsEndpoint().
 				WithCreateEndpoint(
-					expectDeployRequest(
+					expectDeployRequestWithProperties(
 						actionsMeta,
 						"wk-0",
 						"BEFORE_UPLOAD",
 						"",
+						[]*model.Property{
+							{Key: "prop-1", Value: "value-1"},
+							{Key: "prop-2", Value: "value-2"},
+						},
 						&model.Secret{Key: "sec-1", Value: "val-1"},
 						&model.Secret{Key: "sec-2", Value: "val-2"},
 					),
@@ -56,6 +60,10 @@ func TestDeployCommand(t *testing.T) {
 				mf.Secrets = model.Secrets{
 					"sec-1": common.MustEncryptSecret(t, "val-1"),
 					"sec-2": common.MustEncryptSecret(t, "val-2"),
+				}
+				mf.Properties = map[string]string{
+					"prop-1": "value-1",
+					"prop-2": "value-2",
 				}
 			},
 		},
@@ -101,6 +109,93 @@ func TestDeployCommand(t *testing.T) {
 				mf.Secrets = model.Secrets{
 					"sec-1": common.MustEncryptSecret(t, "val-1"),
 				}
+			},
+		},
+		{
+			name:         "update with changed and removed properties",
+			workerAction: "AFTER_MOVE",
+			workerName:   "wk-properties",
+			serverBehavior: common.NewServerStub(t).
+				WithGetOneEndpoint().
+				WithOptionsEndpoint().
+				WithUpdateEndpoint(
+					expectDeployRequestWithProperties(
+						actionsMeta,
+						"wk-properties",
+						"AFTER_MOVE",
+						"",
+						[]*model.Property{
+							{Key: "prop-1", MarkedForRemoval: true},
+							{Key: "prop-1", Value: "new-value"},
+							{Key: "prop-2", MarkedForRemoval: true},
+						},
+					),
+				).
+				WithWorkers(&model.WorkerDetails{
+					Key: "wk-properties",
+					Properties: []*model.Property{
+						{Key: "prop-1", Value: "old-value"},
+						{Key: "prop-2", Value: "remote-only"},
+					},
+				}),
+			patchManifest: func(mf *model.Manifest) {
+				mf.Properties = map[string]string{"prop-1": "new-value"}
+			},
+		},
+		{
+			name:         "secrets and properties are independent",
+			workerAction: "GENERIC_EVENT",
+			workerName:   "wk-independent",
+			serverBehavior: common.NewServerStub(t).
+				WithGetOneEndpoint().
+				WithOptionsEndpoint().
+				WithCreateEndpoint(
+					expectDeployRequestWithProperties(
+						actionsMeta,
+						"wk-independent",
+						"GENERIC_EVENT",
+						"",
+						[]*model.Property{{Key: "shared-key", Value: "property-value"}},
+						&model.Secret{Key: "shared-key", Value: "secret-value"},
+					),
+				),
+			patchManifest: func(mf *model.Manifest) {
+				mf.Secrets = model.Secrets{"shared-key": common.MustEncryptSecret(t, "secret-value")}
+				mf.Properties = map[string]string{"shared-key": "property-value"}
+			},
+		},
+		{
+			name:         "no secrets still sends properties",
+			workerAction: "GENERIC_EVENT",
+			workerName:   "wk-no-secrets",
+			commandArgs:  []string{"--" + model.FlagNoSecrets},
+			serverBehavior: common.NewServerStub(t).
+				WithGetOneEndpoint().
+				WithOptionsEndpoint().
+				WithCreateEndpoint(
+					expectDeployRequestWithProperties(
+						actionsMeta,
+						"wk-no-secrets",
+						"GENERIC_EVENT",
+						"",
+						[]*model.Property{{Key: "prop-1", Value: "value-1"}},
+					),
+				),
+			patchManifest: func(mf *model.Manifest) {
+				mf.Secrets = model.Secrets{"sec-1": "not-encrypted"}
+				mf.Properties = map[string]string{"prop-1": "value-1"}
+			},
+		},
+		{
+			name:         "omitted manifest properties omits request field",
+			workerAction: "GENERIC_EVENT",
+			workerName:   "wk-omitted-properties",
+			serverBehavior: common.NewServerStub(t).
+				WithGetOneEndpoint().
+				WithOptionsEndpoint().
+				WithCreateEndpoint(expectDeployRequestWithoutProperties()),
+			patchManifest: func(mf *model.Manifest) {
+				mf.Properties = nil
 			},
 		},
 		{
@@ -288,6 +383,16 @@ func assertDeployRequestEquals(t require.TestingT, want, got *deployRequest) {
 		gotSecrets = append(gotSecrets, fmt.Sprintf("%s:%s:%v", s.Key, s.Value, s.MarkedForRemoval))
 	}
 	assert.ElementsMatchf(t, wantSecrets, gotSecrets, "Secrets mismatch")
+
+	assert.Equalf(t, len(want.Properties), len(got.Properties), "Properties length mismatch")
+	var wantProperties, gotProperties []string
+	for _, p := range want.Properties {
+		wantProperties = append(wantProperties, fmt.Sprintf("%s:%s:%v", p.Key, p.Value, p.MarkedForRemoval))
+	}
+	for _, p := range got.Properties {
+		gotProperties = append(gotProperties, fmt.Sprintf("%s:%s:%v", p.Key, p.Value, p.MarkedForRemoval))
+	}
+	assert.ElementsMatchf(t, wantProperties, gotProperties, "Properties mismatch")
 }
 
 func expectDeployRequest(actionsMeta common.ActionsMetadata, workerName, actionName, projectKey string, secrets ...*model.Secret) common.BodyValidator {
@@ -297,6 +402,29 @@ func expectDeployRequest(actionsMeta common.ActionsMetadata, workerName, actionN
 		err := json.Unmarshal(body, got)
 		require.NoError(t, err)
 		assertDeployRequestEquals(t, want, got)
+	}
+}
+
+func expectDeployRequestWithProperties(
+	actionsMeta common.ActionsMetadata,
+	workerName, actionName, projectKey string,
+	properties []*model.Property,
+	secrets ...*model.Secret,
+) common.BodyValidator {
+	return func(t require.TestingT, body []byte) {
+		want := getExpectedDeployRequestForAction(t, actionsMeta, workerName, actionName, projectKey, secrets...)
+		want.Properties = properties
+		got := &deployRequest{}
+		require.NoError(t, json.Unmarshal(body, got))
+		assertDeployRequestEquals(t, want, got)
+	}
+}
+
+func expectDeployRequestWithoutProperties() common.BodyValidator {
+	return func(t require.TestingT, body []byte) {
+		var payload map[string]any
+		require.NoError(t, json.Unmarshal(body, &payload))
+		assert.NotContains(t, payload, "properties")
 	}
 }
 

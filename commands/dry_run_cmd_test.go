@@ -20,11 +20,12 @@ import (
 
 func TestDryRun(t *testing.T) {
 	tests := []struct {
-		name          string
-		commandArgs   []string
-		initExtraArgs []string
-		assert        common.AssertOutputFunc
-		patchManifest func(mf *model.Manifest)
+		name               string
+		commandArgs        []string
+		initExtraArgs      []string
+		assert             common.AssertOutputFunc
+		patchManifest      func(mf *model.Manifest)
+		existingProperties []*model.Property
 		// Use this workerKey instead of a random generated one
 		workerKey string
 		// The server behavior
@@ -128,6 +129,44 @@ func TestDryRun(t *testing.T) {
 			},
 			assert: common.AssertOutputJson(map[string]any{"valid": "response"}),
 		},
+		{
+			name:        "stages property updates with no secrets",
+			commandArgs: []string{"--" + model.FlagNoSecrets, `{}`},
+			existingProperties: []*model.Property{
+				{Key: "prop-1", Value: "old-value"},
+				{Key: "prop-2", Value: "remote-only"},
+			},
+			serverStub: common.NewServerStub(t).
+				WithTestEndpoint(
+					validateStagedProperties([]*model.Property{
+						{Key: "prop-1", MarkedForRemoval: true},
+						{Key: "prop-1", Value: "new-value"},
+						{Key: "prop-2", MarkedForRemoval: true},
+					}, true),
+					map[string]any{"valid": "response"},
+				),
+			patchManifest: func(mf *model.Manifest) {
+				mf.Secrets = model.Secrets{"sec-1": "not-encrypted"}
+				mf.Properties = map[string]string{"prop-1": "new-value"}
+			},
+			assert: common.AssertOutputJson(map[string]any{"valid": "response"}),
+		},
+		{
+			name:        "omitted properties omits staged field",
+			commandArgs: []string{`{}`},
+			existingProperties: []*model.Property{
+				{Key: "prop-1", Value: "remote-value"},
+			},
+			serverStub: common.NewServerStub(t).
+				WithTestEndpoint(
+					validateStagedProperties(nil, false),
+					map[string]any{"valid": "response"},
+				),
+			patchManifest: func(mf *model.Manifest) {
+				mf.Properties = nil
+			},
+			assert: common.AssertOutputJson(map[string]any{"valid": "response"}),
+		},
 	}
 
 	for _, tt := range tests {
@@ -150,7 +189,8 @@ func TestDryRun(t *testing.T) {
 					WithDefaultActionsMetadataEndpoint().
 					WithGetOneEndpoint().
 					WithWorkers(&model.WorkerDetails{
-						Key: workerName,
+						Key:        workerName,
+						Properties: tt.existingProperties,
 					}),
 			)
 
@@ -200,6 +240,22 @@ func validateTestPayloadData(data any) common.BodyValidator {
 		}
 		return gotData
 	})
+}
+
+func validateStagedProperties(want []*model.Property, wantField bool) common.BodyValidator {
+	return func(t require.TestingT, body []byte) {
+		var raw map[string]any
+		require.NoError(t, json.Unmarshal(body, &raw))
+		if wantField {
+			assert.Contains(t, raw, "stagedProperties")
+		} else {
+			assert.NotContains(t, raw, "stagedProperties")
+		}
+
+		var payload dryRunRequest
+		require.NoError(t, json.Unmarshal(body, &payload))
+		assert.ElementsMatch(t, want, payload.StagedProperties)
+	}
 }
 
 const workerKeyForDryRunTest = "test-worker"

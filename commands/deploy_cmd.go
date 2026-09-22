@@ -26,6 +26,7 @@ type deployRequest struct {
 	Action         model.Action          `json:"action"`
 	FilterCriteria *model.FilterCriteria `json:"filterCriteria,omitempty"`
 	Secrets        []*model.Secret       `json:"secrets"`
+	Properties     []*model.Property     `json:"properties,omitempty"`
 	ProjectKey     string                `json:"projectKey"`
 	Version        *model.Version        `json:"version,omitempty"`
 }
@@ -66,6 +67,7 @@ Common patterns:
 
 Gotchas:
 - Secrets in manifest.json are decrypted locally and sent in plaintext over TLS unless --no-secrets is set.
+- Properties are clear text, stored unencrypted in manifest.json, and sent over TLS; --no-secrets does not omit them.
 - Filter criteria are only sent when the action requires them (e.g. BEFORE_UPLOAD with a repo filter, SCHEDULED_EVENT with a cron).
 - The --base64 flag is ignored by servers that do not support base64-encoded source code.
 - Versioning fields are only validated against the server's version policy when at least one of --version / --description / --commit-sha is set.
@@ -253,6 +255,10 @@ func (h *deployCommandHandler) prepareRequest(existingWorker *model.WorkerDetail
 		Secrets:     secrets,
 		ProjectKey:  h.manifest.ProjectKey,
 		Version:     h.version,
+	}
+
+	if h.manifest.Properties != nil {
+		payload.Properties = common.PreparePropertiesUpdate(h.manifest, existingWorker)
 	}
 
 	if h.actionMeta.MandatoryFilter {

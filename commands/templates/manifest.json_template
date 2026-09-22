@@ -17,6 +17,7 @@
     },
 {{- end }}
     "secrets": {},
+    "properties": {},
     "sourceCodePath": "./worker.ts",
     "action": "{{.Action}}",
     "enabled": false,
