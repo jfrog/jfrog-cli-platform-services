@@ -19,6 +19,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      issues: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -78,9 +79,14 @@ jobs:
         if: steps.bump.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
+          # GITHUB_TOKEN cannot open PRs unless the org/repo enables
+          # "Allow GitHub Actions to create and approve pull requests".
+          token: ${{ secrets.ECOSYSTEM_GITHUB_TOKEN }}
           commit-message: "chore(deps): bump worker template dependencies"
           title: "chore(deps): bump worker template dependencies"
           branch: chore/bump-worker-template-deps
+          branch-suffix: timestamp
+          delete-branch: true
           add-paths: commands/templates/package.json_template
           labels: dependencies
           body: |
