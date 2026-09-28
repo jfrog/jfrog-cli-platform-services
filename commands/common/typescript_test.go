@@ -4,6 +4,7 @@
 package common
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -222,6 +223,19 @@ func TestExtractActionUsedTypes(t *testing.T) {
 
 			types := ExtractActionUsedTypes(actionMeta)
 			assert.ElementsMatch(t, tt.want, types)
+		})
+	}
+}
+
+// Generated workers are type-checked with strict TS (useUnknownInCatchVariables).
+// Sample fixtures must not use an untyped catch binding and then read error.status / error.message.
+var untypedCatchError = regexp.MustCompile(`catch\s*\(\s*error\s*\)`)
+
+func TestSampleCodeCatchErrorIsTyped(t *testing.T) {
+	for _, actionMeta := range LoadSampleActions(t) {
+		t.Run(actionMeta.Action.Name, func(t *testing.T) {
+			assert.NotRegexp(t, untypedCatchError, actionMeta.SampleCode,
+				"catch (error) is unknown under strict TS; use catch (error: any) or narrow before reading properties")
 		})
 	}
 }
