@@ -11,7 +11,8 @@
   },
   "license": "ISC",
   "devDependencies": {
-    "jfrog-workers": "^0.8.0"
+    "jfrog-workers": "^0.8.0",
+    "typescript": "^5.9.3"
 {{- if .HasTests }},
     "@golevelup/ts-jest": "^0.4.0",
     "@types/jest": "^29.5.12",
