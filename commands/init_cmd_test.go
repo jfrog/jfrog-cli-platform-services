@@ -304,3 +304,28 @@ func testGenerateAllActions(t *testing.T, runCommand runCommandFunc) {
 		t.Run(actionName+" without tests", testGenerateAction(actionName, false, runCommand))
 	}
 }
+
+// TestGenerateWorkableWorker runs the real "worker init" command (against a mocked actions
+// endpoint) and leaves the generated project on disk at $WORKER_INIT_OUTPUT_DIR, so CI can
+// npm install/build/test it to confirm a template dependency bump didn't break codegen.
+// It is a no-op unless that env var is set, so it doesn't leak temp dirs from `make test`.
+func TestGenerateWorkableWorker(t *testing.T) {
+	dir := os.Getenv("WORKER_INIT_OUTPUT_DIR")
+	if dir == "" {
+		t.Skip("WORKER_INIT_OUTPUT_DIR not set")
+	}
+
+	require.NoError(t, os.MkdirAll(dir, os.ModePerm))
+
+	common.NewMockWorkerServer(t, common.NewServerStub(t).WithDefaultActionsMetadataEndpoint())
+
+	oldPwd, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(dir))
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldPwd))
+	})
+
+	runCommand := common.CreateCliRunner(t, GetInitCommand())
+	require.NoError(t, runCommand("worker", "init", "BEFORE_DOWNLOAD", path.Base(dir)))
+}

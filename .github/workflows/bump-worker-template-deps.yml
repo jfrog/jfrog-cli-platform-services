@@ -1,0 +1,77 @@
+name: Bump worker template dependencies
+on:
+  schedule:
+    - cron: '0 6 * * 1' # weekly, Monday 06:00 UTC
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+jobs:
+  bump:
+    name: Bump and verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Bump dependency versions in package.json_template
+        id: bump
+        run: .github/scripts/bump-template-deps.sh
+
+      - name: Setup Go
+        if: steps.bump.outputs.changed == 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Go Cache
+        if: steps.bump.outputs.changed == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/go/pkg/mod
+          key: go-${{ hashFiles('**/go.sum') }}
+          restore-keys: go-
+
+      - name: Run unit tests
+        if: steps.bump.outputs.changed == 'true'
+        run: make test
+
+      - name: Generate a sample worker with the bumped template
+        if: steps.bump.outputs.changed == 'true'
+        env:
+          WORKER_INIT_OUTPUT_DIR: ${{ runner.temp }}/worker-verify
+        run: go test -tags=test ./commands/... -run TestGenerateWorkableWorker -v -timeout 2m
+
+      - name: Verify the generated worker installs, type-checks and tests pass
+        if: steps.bump.outputs.changed == 'true'
+        working-directory: ${{ runner.temp }}/worker-verify
+        run: |
+          npm install
+          npx tsc --noEmit -p tsconfig.json
+          npm test
+
+      - name: Open pull request
+        if: steps.bump.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "chore(deps): bump worker template dependencies"
+          title: "chore(deps): bump worker template dependencies"
+          branch: chore/bump-worker-template-deps
+          add-paths: commands/templates/package.json_template
+          labels: dependencies
+          body: |
+            Automated dependency bump for `commands/templates/package.json_template`
+            (the manifest `jf worker init` scaffolds into new worker projects).
+
+            Verified in this run: `jf worker init` still succeeds (mocked server) and
+            the generated project installs, type-checks, and passes its sample test
+            with these versions.
