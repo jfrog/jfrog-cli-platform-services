@@ -9,8 +9,21 @@
 set -euo pipefail
 
 FILE="${1:-commands/templates/package.json_template}"
+# Comma-separated package names to leave unchanged (empty or unset: exclude nothing).
+EXCLUDE_DEPS="${EXCLUDE_DEPS-}"
 
 changed=false
+
+excluded() {
+  local pkg="$1" item
+  local IFS=','
+  for item in $EXCLUDE_DEPS; do
+    item="${item#"${item%%[![:space:]]*}"}"
+    item="${item%"${item##*[![:space:]]}"}"
+    [[ -n "$item" && "$item" == "$pkg" ]] && return 0
+  done
+  return 1
+}
 
 # Only scan inside the devDependencies block, so top-level fields that happen to look
 # like a version string (e.g. "version": "1.0.0") are never mistaken for a package.
@@ -21,6 +34,11 @@ while IFS=: read -r lineno content; do
   name=$(sed -E 's/^[[:space:]]*"([^"]+)".*/\1/' <<<"$content")
   prefix=$(sed -E 's/.*:[[:space:]]*"([~^]?)[0-9].*/\1/' <<<"$content")
   current=$(sed -E 's/.*"[~^]?([0-9]+\.[0-9]+\.[0-9]+)".*/\1/' <<<"$content")
+
+  if excluded "$name"; then
+    echo "Skipping $name (excluded)"
+    continue
+  fi
 
   latest=$(npm view "$name" version)
 

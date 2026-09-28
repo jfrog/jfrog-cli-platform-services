@@ -3,6 +3,12 @@ on:
   schedule:
     - cron: '0 6 * * 1' # weekly, Monday 06:00 UTC
   workflow_dispatch:
+    inputs:
+      exclude:
+        description: Comma-separated list of dependencies to skip when bumping
+        required: false
+        default: typescript
+        type: string
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
@@ -24,7 +30,16 @@ jobs:
 
       - name: Bump dependency versions in package.json_template
         id: bump
-        run: .github/scripts/bump-template-deps.sh
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_EXCLUDE: ${{ github.event.inputs.exclude }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            export EXCLUDE_DEPS="$DISPATCH_EXCLUDE"
+          else
+            export EXCLUDE_DEPS="typescript"
+          fi
+          .github/scripts/bump-template-deps.sh
 
       - name: Setup Go
         if: steps.bump.outputs.changed == 'true'
