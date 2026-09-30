@@ -23,7 +23,7 @@ func FetchWorkerDetails(c model.IntFlagProvider, serverURL string, accessToken s
 			if len(content) == 0 {
 				return nil
 			}
-			log.Info(fmt.Sprintf("Worker %s details returned from the server", details.Key))
+			log.Info(fmt.Sprintf("Worker %s details returned from the server", workerKey))
 			return json.Unmarshal(content, details)
 		},
 	})
