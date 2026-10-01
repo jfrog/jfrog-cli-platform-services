@@ -26,6 +26,7 @@ type deployRequest struct {
 	Action         model.Action          `json:"action"`
 	FilterCriteria *model.FilterCriteria `json:"filterCriteria,omitempty"`
 	Secrets        []*model.Secret       `json:"secrets"`
+	Properties     []*model.Property     `json:"properties,omitempty"`
 	ProjectKey     string                `json:"projectKey"`
 	Version        *model.Version        `json:"version,omitempty"`
 }
@@ -60,15 +61,16 @@ Prerequisites:
 Common patterns:
   $ jf worker deploy
   $ jf worker deploy --no-secrets
-  $ jf worker deploy --version 1.2.3 --description "Add filter" --commit-sha abc1234
+  $ jf worker deploy --changes-version 1.2.3 --changes-description "Add filter" --changes-commitsha abc1234
   $ jf worker deploy --base64
   $ jf worker deploy --format json
 
 Gotchas:
 - Secrets in manifest.json are decrypted locally and sent in plaintext over TLS unless --no-secrets is set.
+- Properties are clear text, stored unencrypted in manifest.json, and sent over TLS; --no-secrets does not omit them.
 - Filter criteria are only sent when the action requires them (e.g. BEFORE_UPLOAD with a repo filter, SCHEDULED_EVENT with a cron).
 - The --base64 flag is ignored by servers that do not support base64-encoded source code.
-- Versioning fields are only validated against the server's version policy when at least one of --version / --description / --commit-sha is set.
+- Versioning fields are only validated against the server's version policy when at least one of --changes-version / --changes-description / --changes-commitsha is set.
 
 Related: jf worker test-run, jf worker undeploy, jf worker list, jf worker edit-schedule`,
 		Aliases:          []string{"d"},
@@ -253,6 +255,10 @@ func (h *deployCommandHandler) prepareRequest(existingWorker *model.WorkerDetail
 		Secrets:     secrets,
 		ProjectKey:  h.manifest.ProjectKey,
 		Version:     h.version,
+	}
+
+	if h.manifest.Properties != nil {
+		payload.Properties = common.PreparePropertiesUpdate(h.manifest, existingWorker)
 	}
 
 	if h.actionMeta.MandatoryFilter {

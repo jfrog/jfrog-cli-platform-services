@@ -37,6 +37,12 @@ func TestDeployCommand(t *testing.T) {
 			name:      "create",
 			workerKey: "wk-0",
 			timeout:   10 * time.Second,
+			patchManifest: func(mf *model.Manifest) {
+				mf.Properties = map[string]string{
+					"prop-1": "value-1",
+					"prop-2": "value-2",
+				}
+			},
 		}),
 		deployTestSpec(deployTestCase{
 			name:        "create with a version",
@@ -188,4 +194,10 @@ func assertWorkerDeployed(it *infra.Test, mf *model.Manifest) {
 		assert.Truef(it, secretShouldHaveBeenDeployed, "Invalid deployed secret %s", deployedSecret)
 		infra.AssertSecretValueFromServer(it, mf.Name, deployedSecret.Key, mf.Secrets[deployedSecret.Key])
 	}
+
+	deployedProperties := make(map[string]string, len(deployed.Properties))
+	for _, property := range deployed.Properties {
+		deployedProperties[property.Key] = property.Value
+	}
+	assert.Equalf(it, mf.Properties, deployedProperties, "Properties mismatch")
 }

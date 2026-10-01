@@ -28,6 +28,7 @@ func getCommands() []components.Command {
 		commands.GetRemoveCommand(),
 		commands.GetListCommand(),
 		commands.GetAddSecretCommand(),
+		commands.GetAddPropertyCommand(),
 		commands.GetListEventsCommand(),
 		commands.GetEditScheduleCommand(),
 		commands.GetShowExecutionHistoryCommand(),
