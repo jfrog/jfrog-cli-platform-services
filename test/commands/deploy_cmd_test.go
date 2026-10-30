@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"testing"
 	"time"
 
@@ -166,27 +167,35 @@ func deployTestSpec(tc deployTestCase) infra.TestDefinition {
 	}
 }
 
+const (
+	deployedWorkerPollInterval = 500 * time.Millisecond
+	deployedWorkerPollTimeout  = 15 * time.Second
+)
+
 func assertWorkerDeployed(it *infra.Test, mf *model.Manifest) {
-	ctx, cancelCtx := context.WithTimeout(context.Background(), 15*time.Second)
-	it.Cleanup(cancelCtx)
+	sourceCode, err := common.ReadSourceCode(mf)
+	require.NoError(it, err)
+	wantSourceCode := common.CleanImports(sourceCode)
 
-	deployed := model.WorkerDetails{}
+	wantProperties := mf.Properties
+	if wantProperties == nil {
+		wantProperties = map[string]string{}
+	}
 
-	it.NewHttpRequestWithContext(ctx).
-		WithAccessToken().
-		Get("/worker/api/v1/workers/" + mf.Name).
-		Do().
-		IsOk().
-		AsObject(&deployed)
+	// Worker service replicas cache workers and are invalidated asynchronously,
+	// so a read right after a deploy may still return the previous revision.
+	deadline := time.Now().Add(deployedWorkerPollTimeout)
+	deployed := fetchDeployedWorker(it, mf.Name)
+	for !deployedWorkerMatches(deployed, mf, wantSourceCode, wantProperties) && time.Now().Before(deadline) {
+		time.Sleep(deployedWorkerPollInterval)
+		deployed = fetchDeployedWorker(it, mf.Name)
+	}
 
 	assert.Equalf(it, mf.Name, deployed.Key, "Key mismatch")
 	assert.Equalf(it, mf.Action, deployed.Action, "Action mismatch")
 	assert.Equalf(it, mf.Description, deployed.Description, "Description mismatch")
 	assert.Equalf(it, mf.Enabled, deployed.Enabled, "Enabled mismatch")
-
-	sourceCode, err := common.ReadSourceCode(mf)
-	require.NoError(it, err)
-	assert.Equalf(it, common.CleanImports(sourceCode), deployed.SourceCode, "SourceCode mismatch")
+	assert.Equalf(it, wantSourceCode, deployed.SourceCode, "SourceCode mismatch")
 
 	require.Equalf(it, len(mf.Secrets), len(deployed.Secrets), "Secrets length mismatch")
 	for _, deployedSecret := range deployed.Secrets {
@@ -195,9 +204,48 @@ func assertWorkerDeployed(it *infra.Test, mf *model.Manifest) {
 		infra.AssertSecretValueFromServer(it, mf.Name, deployedSecret.Key, mf.Secrets[deployedSecret.Key])
 	}
 
-	deployedProperties := make(map[string]string, len(deployed.Properties))
-	for _, property := range deployed.Properties {
-		deployedProperties[property.Key] = property.Value
+	assert.Equalf(it, wantProperties, deployedPropertiesByKey(deployed), "Properties mismatch")
+}
+
+func fetchDeployedWorker(it *infra.Test, workerKey string) *model.WorkerDetails {
+	ctx, cancelCtx := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancelCtx()
+
+	deployed := &model.WorkerDetails{}
+
+	it.NewHttpRequestWithContext(ctx).
+		WithAccessToken().
+		Get("/worker/api/v1/workers/" + workerKey).
+		Do().
+		IsOk().
+		AsObject(deployed)
+
+	return deployed
+}
+
+func deployedWorkerMatches(deployed *model.WorkerDetails, mf *model.Manifest, wantSourceCode string, wantProperties map[string]string) bool {
+	if deployed.Key != mf.Name ||
+		deployed.Action != mf.Action ||
+		deployed.Description != mf.Description ||
+		deployed.Enabled != mf.Enabled ||
+		deployed.SourceCode != wantSourceCode ||
+		len(deployed.Secrets) != len(mf.Secrets) {
+		return false
 	}
-	assert.Equalf(it, mf.Properties, deployedProperties, "Properties mismatch")
+
+	for _, deployedSecret := range deployed.Secrets {
+		if _, ok := mf.Secrets[deployedSecret.Key]; !ok {
+			return false
+		}
+	}
+
+	return maps.Equal(wantProperties, deployedPropertiesByKey(deployed))
+}
+
+func deployedPropertiesByKey(deployed *model.WorkerDetails) map[string]string {
+	properties := make(map[string]string, len(deployed.Properties))
+	for _, property := range deployed.Properties {
+		properties[property.Key] = property.Value
+	}
+	return properties
 }
