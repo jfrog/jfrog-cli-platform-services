@@ -6,6 +6,7 @@ package common
 import (
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -134,6 +135,54 @@ func TestCallWorkerAPI(t *testing.T) {
 			} else {
 				assert.Regexpf(t, tt.wantErr, err.Error(), "got: %+v", err)
 			}
+		})
+	}
+}
+
+func TestCallWorkerAPI_PathEscaping(t *testing.T) {
+	tests := []struct {
+		name    string
+		path    []string
+		wantURI string
+		wantErr string
+	}{
+		{name: "ticket case", path: []string{"workers", "../x?y"}, wantURI: "/worker/api/v1/workers/..%2Fx%3Fy?projectKey=p"},
+		{
+			name:    "slashes",
+			path:    []string{"workers", "x/../../../../artifactory/api/repositories/libs-release-local"},
+			wantURI: "/worker/api/v1/workers/x%2F..%2F..%2F..%2F..%2Fartifactory%2Fapi%2Frepositories%2Flibs-release-local?projectKey=p",
+		},
+		{name: "hash", path: []string{"execute", "a#b"}, wantURI: "/worker/api/v1/execute/a%23b?projectKey=p"},
+		{name: "plain key", path: []string{"workers", "wk-1"}, wantURI: "/worker/api/v1/workers/wk-1?projectKey=p"},
+		{name: "constant path", path: []string{"scaffold", "tsconfig"}, wantURI: "/worker/api/v1/scaffold/tsconfig?projectKey=p"},
+		{name: "double dot", path: []string{"workers", ".."}, wantErr: "invalid path element '..' in worker API call"},
+		{name: "single dot", path: []string{"workers", "."}, wantErr: "invalid path element '.' in worker API call"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotURI string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotURI = r.RequestURI
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer srv.Close()
+
+			err := CallWorkerAPI(IntFlagMap{}, APICallParams{
+				Method:     http.MethodGet,
+				ServerURL:  srv.URL,
+				Path:       tt.path,
+				ProjectKey: "p",
+				OkStatuses: []int{http.StatusOK},
+			})
+
+			if tt.wantErr != "" {
+				assert.ErrorContains(t, err, tt.wantErr)
+				assert.Empty(t, gotURI, "no request should be sent")
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantURI, gotURI)
 		})
 	}
 }
