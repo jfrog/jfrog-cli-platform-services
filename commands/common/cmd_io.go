@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"text/template"
 
 	"github.com/jfrog/jfrog-client-go/utils/log"
 
@@ -19,6 +20,15 @@ var (
 	cliOut io.Writer = os.Stdout
 	cliIn  io.Reader = os.Stdin
 )
+
+// TemplateFuncs are the functions available to the scaffold templates. "json" JSON-encodes a value
+// so that server-supplied data cannot break out of a JSON string literal.
+var TemplateFuncs = template.FuncMap{
+	"json": func(v any) (string, error) {
+		b, err := json.Marshal(v)
+		return string(b), err
+	},
+}
 
 type InputReader struct {
 	ctx *components.Context

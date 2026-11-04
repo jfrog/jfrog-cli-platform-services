@@ -1,6 +1,6 @@
 {
-    "name": "{{.WorkerName}}",
-    "description": "Run a script on {{.Action}}",
+    "name": {{json .WorkerName}},
+    "description": {{json (printf "Run a script on %s" .Action)}},
 {{- if .HasRepoFilterCriteria }}
     "filterCriteria": {
         "artifactFilterCriteria": {
@@ -19,9 +19,9 @@
     "secrets": {},
     "properties": {},
     "sourceCodePath": "./worker.ts",
-    "action": "{{.Action}}",
+    "action": {{json .Action}},
     "enabled": false,
     "debug": false,
-    "projectKey": "{{.ProjectKey}}",
-    "application": "{{.Application}}"
+    "projectKey": {{json .ProjectKey}},
+    "application": {{json .Application}}
 }

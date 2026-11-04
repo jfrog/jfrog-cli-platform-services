@@ -65,7 +65,7 @@ func PrepareWorkerDirForTest(t *testing.T) (string, string) {
 }
 
 func GenerateFromSamples(t require.TestingT, templates embed.FS, action string, workerName string, projectKey string, templateName string, skipTests ...bool) string {
-	tpl, err := template.New(templateName).ParseFS(templates, "templates/"+templateName)
+	tpl, err := template.New(templateName).Funcs(TemplateFuncs).ParseFS(templates, "templates/"+templateName)
 	require.NoErrorf(t, err, "cannot initialize the template for %s", action)
 
 	actionsMeta := LoadSampleActions(t)

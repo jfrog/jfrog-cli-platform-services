@@ -4,6 +4,7 @@
 package commands
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -73,6 +74,54 @@ func TestInitWorker(t *testing.T) {
 				common.PrepareWorkerDirForTest(t)
 				err := runCommand("worker", "init", "--"+model.FlagProjectKey, "prj-1", "BEFORE_DOWNLOAD", "root")
 				assert.NoError(t, err)
+			},
+		},
+		{
+			name: "should escape server-supplied application in manifest",
+			stub: common.NewServerStub(t).WithActionsMetadataEndpoint(stubActionWith(t, func(md *model.ActionMetadata) {
+				md.Action.Application = "artifactory\", \"sourceCodePath\": \"/etc/passwd\", \"projectKey\": \"evil\", \"x\": \""
+			})),
+			test: func(t *testing.T, runCommand runCommandFunc) {
+				dir, workerName := common.PrepareWorkerDirForTest(t)
+				require.NoError(t, runCommand("worker", "init", "BEFORE_DOWNLOAD", workerName))
+
+				raw, err := os.ReadFile(path.Join(dir, "manifest.json"))
+				require.NoError(t, err)
+				require.True(t, json.Valid(raw))
+
+				var generic map[string]any
+				require.NoError(t, json.Unmarshal(raw, &generic))
+				assert.NotContains(t, generic, "x")
+
+				manifest, err := common.ReadManifest(dir)
+				require.NoError(t, err)
+				assert.Equal(t, "./worker.ts", manifest.SourceCodePath)
+				assert.Empty(t, manifest.ProjectKey)
+				assert.Equal(t, "artifactory\", \"sourceCodePath\": \"/etc/passwd\", \"projectKey\": \"evil\", \"x\": \"", manifest.Application)
+			},
+		},
+		{
+			name: "should reject a non-identifier executionRequestType",
+			stub: common.NewServerStub(t).WithActionsMetadataEndpoint(stubActionWith(t, func(md *model.ActionMetadata) {
+				md.ExecutionRequestType = "X } from './types'; import fs from 'fs"
+			})),
+			test: func(t *testing.T, runCommand runCommandFunc) {
+				dir, workerName := common.PrepareWorkerDirForTest(t)
+				err := runCommand("worker", "init", "BEFORE_DOWNLOAD", workerName)
+				assert.Regexp(t, `invalid execution request type`, err)
+				for _, f := range []string{"worker.spec.ts", "manifest.json", "package.json"} {
+					assert.NoFileExists(t, path.Join(dir, f))
+				}
+			},
+		},
+		{
+			name: "should escape a worker name containing quotes",
+			test: func(t *testing.T, runCommand runCommandFunc) {
+				dir, _ := common.PrepareWorkerDirForTest(t)
+				require.NoError(t, runCommand("worker", "init", "BEFORE_DOWNLOAD", `my"worker`))
+				manifest, err := common.ReadManifest(dir)
+				require.NoError(t, err)
+				assert.Equal(t, `my"worker`, manifest.Name)
 			},
 		},
 		{
@@ -246,6 +295,17 @@ func testForceOverwriteTSConfigFromServer(t *testing.T, runCommand runCommandFun
 	got, err := os.ReadFile(tsconfigPath)
 	require.NoError(t, err)
 	assert.Equal(t, `{"compilerOptions":{"strict":true,"fromServer":true}}`, string(got))
+}
+
+// stubActionWith returns the sample actions where BEFORE_DOWNLOAD has been altered by modify.
+func stubActionWith(t *testing.T, modify func(md *model.ActionMetadata)) common.ActionsMetadata {
+	actions := common.LoadSampleActions(t)
+	for _, md := range actions {
+		if md.Action.Name == "BEFORE_DOWNLOAD" {
+			modify(md)
+		}
+	}
+	return actions
 }
 
 func testGenerateAction(actionName string, withTests bool, runCommand runCommandFunc) func(t *testing.T) {
