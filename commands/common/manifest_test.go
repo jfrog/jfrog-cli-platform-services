@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/jfrog/jfrog-cli-platform-services/model"
@@ -220,6 +221,26 @@ func TestManifest_Validate(t *testing.T) {
 			}),
 			assert: func(t *testing.T, err error) {
 				assert.EqualError(t, err, invalidManifestErr("missing name").Error())
+			},
+		},
+		{
+			name:        "invalid name",
+			actionsMeta: sampleActions,
+			manifest: patchedManifestSample(func(mf *model.Manifest) {
+				mf.Name = "../x?y"
+			}),
+			assert: func(t *testing.T, err error) {
+				assert.EqualError(t, err, invalidManifestErr("invalid worker key '../x?y': must start with a letter").Error())
+			},
+		},
+		{
+			name:        "name too long",
+			actionsMeta: sampleActions,
+			manifest: patchedManifestSample(func(mf *model.Manifest) {
+				mf.Name = "a" + strings.Repeat("b", 40)
+			}),
+			assert: func(t *testing.T, err error) {
+				assert.ErrorContains(t, err, "must be lower than 40 chars long")
 			},
 		},
 		{
@@ -499,4 +520,52 @@ func patchedManifestSample(patch func(mf *model.Manifest)) *model.Manifest {
 	patched := *manifestSample
 	patch(&patched)
 	return &patched
+}
+
+func TestValidateWorkerKey(t *testing.T) {
+	const (
+		minMsg   = "must be at least 2 chars long"
+		maxMsg   = "must be lower than 40 chars long"
+		startMsg = "must start with a letter"
+	)
+
+	tests := []struct {
+		key     string
+		wantErr string // empty means valid, otherwise the full expected error
+	}{
+		{key: "ab"},
+		{key: "a" + strings.Repeat("b", 39)},
+		{key: "my-worker"},
+		{key: "wk_1"},
+		{key: "A-b_C-9"},
+		{key: `a\b`},
+		{key: "worker-1234567890-init"},
+		{key: "a", wantErr: "invalid worker key 'a': " + minMsg},
+		{key: "", wantErr: "invalid worker key '': " + minMsg},
+		{key: "a" + strings.Repeat("b", 40), wantErr: "invalid worker key '" + "a" + strings.Repeat("b", 40) + "': " + maxMsg},
+		{key: "1worker", wantErr: "invalid worker key '1worker': " + startMsg},
+		{key: "-worker", wantErr: "invalid worker key '-worker': " + startMsg},
+		{key: "_w", wantErr: "invalid worker key '_w': " + startMsg},
+		{key: "..", wantErr: "invalid worker key '..': " + startMsg},
+		{key: "../x?y", wantErr: "invalid worker key '../x?y': " + startMsg},
+		{key: "ab/cd", wantErr: "invalid worker key 'ab/cd'"},
+		{key: "x?y", wantErr: "invalid worker key 'x?y'"},
+		{key: "a#b", wantErr: "invalid worker key 'a#b'"},
+		{key: "a.b", wantErr: "invalid worker key 'a.b'"},
+		{key: "my worker", wantErr: "invalid worker key 'my worker'"},
+		{key: "a%2F", wantErr: "invalid worker key 'a%2F'"},
+		{key: "wé", wantErr: "invalid worker key 'wé'"},
+		{key: "ab\n", wantErr: "invalid worker key 'ab\n'"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			err := ValidateWorkerKey(tt.key)
+			if tt.wantErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.wantErr)
+			}
+		})
+	}
 }

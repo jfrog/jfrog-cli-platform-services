@@ -32,6 +32,12 @@ func ExtractProjectAndKeyFromCommandContext(c stringFlagAware, args []string, mi
 
 	if len(args) > 0 && len(args) > minArguments {
 		workerKey = args[0]
+		// An empty argument falls back to the manifest name, which is validated there.
+		if workerKey != "" {
+			if err := ValidateWorkerKey(workerKey); err != nil {
+				return "", "", err
+			}
+		}
 	}
 
 	if workerKey == "" || projectKey == "" {
@@ -43,7 +49,13 @@ func ExtractProjectAndKeyFromCommandContext(c stringFlagAware, args []string, mi
 			return workerKey, projectKey, nil
 		}
 
-		if err = ValidateManifest(manifest, nil); err != nil {
+		// The manifest name is only used (and must be valid) when it is the worker key.
+		toValidate := *manifest
+		if workerKey != "" {
+			toValidate.Name = workerKey
+		}
+
+		if err = ValidateManifest(&toValidate, nil); err != nil {
 			return "", "", err
 		}
 

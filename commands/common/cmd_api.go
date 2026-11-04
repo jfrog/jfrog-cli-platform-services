@@ -68,7 +68,16 @@ func CallWorkerAPI(c model.IntFlagProvider, params APICallParams) error {
 		apiVersion = params.APIVersion
 	}
 
-	apiEndpoint := fmt.Sprintf("%sworker/api/v%d/%s", utils.AddTrailingSlashIfNeeded(params.ServerURL), apiVersion, strings.Join(params.Path, "/"))
+	escapedPath := make([]string, len(params.Path))
+	for i, p := range params.Path {
+		// PathEscape leaves dot-segments untouched, so they must be rejected.
+		if p == "." || p == ".." {
+			return apiError(http.StatusBadRequest, "invalid path element '%s' in worker API call", p)
+		}
+		escapedPath[i] = url.PathEscape(p)
+	}
+
+	apiEndpoint := fmt.Sprintf("%sworker/api/v%d/%s", utils.AddTrailingSlashIfNeeded(params.ServerURL), apiVersion, strings.Join(escapedPath, "/"))
 
 	q := url.Values{}
 

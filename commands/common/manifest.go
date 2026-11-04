@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"github.com/jfrog/jfrog-cli-platform-services/model"
 	"github.com/jfrog/jfrog-client-go/utils/log"
@@ -94,9 +95,31 @@ func ReadSourceCode(mf *model.Manifest) (string, error) {
 	return string(sourceBytes), nil
 }
 
+// workerKeyPattern mirrors the server rule (platform-extension, workerValidator.service.ts, assertWorkerKeyIsValid).
+var workerKeyPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_\\-]+$`)
+
+// ValidateWorkerKey checks the worker key against the same rules as the Workers service.
+func ValidateWorkerKey(key string) error {
+	switch {
+	case len(key) < 2:
+		return fmt.Errorf("invalid worker key '%s': must be at least 2 chars long", key)
+	case len(key) > 40:
+		return fmt.Errorf("invalid worker key '%s': must be lower than 40 chars long", key)
+	case (key[0] < 'a' || key[0] > 'z') && (key[0] < 'A' || key[0] > 'Z'):
+		return fmt.Errorf("invalid worker key '%s': must start with a letter", key)
+	case !workerKeyPattern.MatchString(key):
+		return fmt.Errorf("invalid worker key '%s'", key)
+	}
+	return nil
+}
+
 func ValidateManifest(mf *model.Manifest, actionsMeta ActionsMetadata) error {
 	if mf.Name == "" {
 		return invalidManifestErr("missing name")
+	}
+
+	if err := ValidateWorkerKey(mf.Name); err != nil {
+		return invalidManifestErr(err.Error())
 	}
 
 	if mf.SourceCodePath == "" {

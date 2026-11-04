@@ -97,6 +97,8 @@ func Test_extractProjectAndKeyFromCommandContext(t *testing.T) {
 		minArguments int
 		onlyGeneric  bool
 		eventType    string
+		skipManifest bool
+		manifestName string
 		assert       func(t *testing.T, manifestWorkerKey, manifestProjectKey, extractedWorkerKey, extractedProjectKey string, err error)
 	}{
 		{
@@ -146,6 +148,55 @@ func Test_extractProjectAndKeyFromCommandContext(t *testing.T) {
 				assert.Equal(t, manifestProjectKey, extractedProjectKey)
 			},
 		},
+		{
+			name:         "empty worker key arg falls back to manifest",
+			c:            mockStringFlagAware{},
+			args:         []string{""},
+			minArguments: 0,
+			assert: func(t *testing.T, manifestWorkerKey, manifestProjectKey, extractedWorkerKey, extractedProjectKey string, err error) {
+				require.NoError(t, err)
+				assert.Equal(t, manifestWorkerKey, extractedWorkerKey)
+				assert.Equal(t, manifestProjectKey, extractedProjectKey)
+			},
+		},
+		{
+			name: "invalid worker key from args",
+			c:    mockStringFlagAware{},
+			args: []string{"../x"},
+			assert: func(t *testing.T, _, _, extractedWorkerKey, _ string, err error) {
+				assert.EqualError(t, err, "invalid worker key '../x': must start with a letter")
+				assert.Empty(t, extractedWorkerKey)
+			},
+		},
+		{
+			name:         "invalid worker key from args without manifest",
+			c:            mockStringFlagAware{},
+			args:         []string{"../x"},
+			skipManifest: true,
+			assert: func(t *testing.T, _, _, extractedWorkerKey, _ string, err error) {
+				assert.EqualError(t, err, "invalid worker key '../x': must start with a letter")
+				assert.Empty(t, extractedWorkerKey)
+			},
+		},
+		{
+			name:         "invalid worker key from manifest",
+			c:            mockStringFlagAware{},
+			manifestName: "x?y",
+			assert: func(t *testing.T, _, _, _, _ string, err error) {
+				assert.EqualError(t, err, "invalid manifest: invalid worker key 'x?y'")
+			},
+		},
+		{
+			name:         "valid key from args ignores invalid manifest name",
+			c:            mockStringFlagAware{},
+			args:         []string{"good-key"},
+			manifestName: "my.worker",
+			assert: func(t *testing.T, _, manifestProjectKey, extractedWorkerKey, extractedProjectKey string, err error) {
+				require.NoError(t, err)
+				assert.Equal(t, "good-key", extractedWorkerKey)
+				assert.Equal(t, manifestProjectKey, extractedProjectKey)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -164,7 +215,13 @@ func Test_extractProjectAndKeyFromCommandContext(t *testing.T) {
 				mf.Action = "GENERIC_EVENT"
 			}
 
-			require.NoError(t, SaveManifest(&mf, dir))
+			if tt.manifestName != "" {
+				mf.Name = tt.manifestName
+			}
+
+			if !tt.skipManifest {
+				require.NoError(t, SaveManifest(&mf, dir))
+			}
 
 			workerKey, projectKey, err := ExtractProjectAndKeyFromCommandContext(tt.c, tt.args, tt.minArguments, tt.onlyGeneric)
 

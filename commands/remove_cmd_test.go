@@ -46,6 +46,12 @@ func TestRemoveCommand(t *testing.T) {
 				WithDeleteEndpoint(),
 		},
 		{
+			name:           "fails on invalid worker key",
+			commandArgs:    []string{"../x"},
+			serverBehavior: common.NewServerStub(t),
+			assert:         common.AssertOutputError("invalid worker key '../x': must start with a letter"),
+		},
+		{
 			name:        "fails if timeout exceeds",
 			commandArgs: []string{"--" + model.FlagTimeout, "500"},
 			serverBehavior: common.NewServerStub(t).
