@@ -140,13 +140,28 @@ func TestReadManifestPreservesOmittedAndEmptyProperties(t *testing.T) {
 	}
 }
 
+func symlinkOrSkip(t *testing.T, target, link string) {
+	t.Helper()
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("cannot create symlink: %v", err)
+	}
+}
+
+func rejected(t assert.TestingT, err error, _ ...interface{}) bool {
+	assert.ErrorContains(t, err, "must be a relative path inside the worker directory")
+	return false
+}
+
 func TestManifest_ReadSourceCode(t *testing.T) {
 	tests := []struct {
 		name       string
 		sourceCode string
 		manifest   *model.Manifest
-		want       string
-		wantErr    assert.ErrorAssertionFunc
+		// setup optionally prepares the folder and returns the manifest to use instead of manifest.
+		// outside is an existing file located outside dir.
+		setup   func(t *testing.T, dir, outside string) *model.Manifest
+		want    string
+		wantErr assert.ErrorAssertionFunc
 	}{
 		{
 			name:       "nominal case",
@@ -167,6 +182,76 @@ func TestManifest_ReadSourceCode(t *testing.T) {
 				return false
 			},
 		},
+		{
+			name: "nested relative path",
+			setup: func(t *testing.T, dir, _ string) *model.Manifest {
+				require.NoError(t, os.Mkdir(filepath.Join(dir, "sub"), 0o700))
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "my-worker.ts"), []byte("nested"), 0o600))
+				return patchedManifestSample(func(mf *model.Manifest) { mf.SourceCodePath = "sub/../my-worker.ts" })
+			},
+			want:    "nested",
+			wantErr: assert.NoError,
+		},
+		{
+			name: "symlink inside the directory",
+			setup: func(t *testing.T, dir, _ string) *model.Manifest {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "my-worker.ts"), []byte("linked"), 0o600))
+				symlinkOrSkip(t, "my-worker.ts", filepath.Join(dir, "link.ts"))
+				return patchedManifestSample(func(mf *model.Manifest) { mf.SourceCodePath = "link.ts" })
+			},
+			want:    "linked",
+			wantErr: assert.NoError,
+		},
+		{
+			name: "absolute path outside the directory rejected",
+			setup: func(t *testing.T, _, outside string) *model.Manifest {
+				return patchedManifestSample(func(mf *model.Manifest) { mf.SourceCodePath = outside })
+			},
+			wantErr: rejected,
+		},
+		{
+			name: "absolute path inside the directory rejected",
+			setup: func(t *testing.T, dir, _ string) *model.Manifest {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "my-worker.ts"), []byte("x"), 0o600))
+				return patchedManifestSample(func(mf *model.Manifest) { mf.SourceCodePath = filepath.Join(dir, "my-worker.ts") })
+			},
+			wantErr: rejected,
+		},
+		{
+			name: "parent traversal rejected",
+			setup: func(t *testing.T, dir, outside string) *model.Manifest {
+				rel, err := filepath.Rel(dir, outside)
+				require.NoError(t, err)
+				return patchedManifestSample(func(mf *model.Manifest) { mf.SourceCodePath = rel })
+			},
+			wantErr: rejected,
+		},
+		{
+			name: "symlink escaping the directory rejected",
+			setup: func(t *testing.T, dir, outside string) *model.Manifest {
+				symlinkOrSkip(t, outside, filepath.Join(dir, "escape.ts"))
+				return patchedManifestSample(func(mf *model.Manifest) { mf.SourceCodePath = "escape.ts" })
+			},
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				assert.ErrorContains(t, err, "invalid manifest:")
+				assert.ErrorContains(t, err, "cannot read sourceCodePath 'escape.ts'")
+				assert.ErrorContains(t, err, "path escapes")
+				assert.False(t, os.IsNotExist(err))
+				return false
+			},
+		},
+		{
+			name: "directory instead of a file",
+			setup: func(t *testing.T, dir, _ string) *model.Manifest {
+				require.NoError(t, os.Mkdir(filepath.Join(dir, "sub"), 0o700))
+				return patchedManifestSample(func(mf *model.Manifest) { mf.SourceCodePath = "sub" })
+			},
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				assert.ErrorContains(t, err, "invalid manifest: cannot read sourceCodePath 'sub'")
+				assert.NotContains(t, err.Error(), "path escapes")
+				return false
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -183,10 +268,17 @@ func TestManifest_ReadSourceCode(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			err = os.Chdir(manifestFolder)
-			require.NoError(t, err)
+			manifest := tt.manifest
+			if tt.setup != nil {
+				outsideFolder := t.TempDir()
+				outside := filepath.Join(outsideFolder, "secret.txt")
+				require.NoError(t, os.WriteFile(outside, []byte("secret"), 0o600))
+				manifest = tt.setup(t, manifestFolder, outside)
+			}
 
-			got, err := ReadSourceCode(manifestSample)
+			t.Chdir(manifestFolder)
+
+			got, err := ReadSourceCode(manifest)
 			if !tt.wantErr(t, err, "ReadSourceCode()") {
 				return
 			}

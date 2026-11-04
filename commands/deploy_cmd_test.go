@@ -36,6 +36,18 @@ func TestDeployCommand(t *testing.T) {
 		patchManifest  func(mf *model.Manifest)
 	}{
 		{
+			name:         "fails if source code path escapes the worker directory",
+			workerAction: "BEFORE_UPLOAD",
+			workerName:   "wk-escape",
+			serverBehavior: common.NewServerStub(t).
+				WithGetOneEndpoint().
+				WithOptionsEndpoint(),
+			patchManifest: func(mf *model.Manifest) {
+				mf.SourceCodePath = "../outside.ts"
+			},
+			wantErr: errors.New("invalid manifest: sourceCodePath '../outside.ts' must be a relative path inside the worker directory"),
+		},
+		{
 			name:         "create",
 			workerAction: "BEFORE_UPLOAD",
 			workerName:   "wk-0",

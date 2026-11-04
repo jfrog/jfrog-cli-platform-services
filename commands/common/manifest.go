@@ -85,11 +85,26 @@ func SaveManifest(mf *model.Manifest, dir ...string) error {
 	return err
 }
 
-// ReadSourceCode reads the content of the file pointed by SourceCodePath
+// ReadSourceCode reads the content of the file pointed by SourceCodePath.
+// The path must stay inside the current working directory (where manifest.json is read from), symlinks included.
 func ReadSourceCode(mf *model.Manifest) (string, error) {
 	log.Debug(fmt.Sprintf("Reading source code from %s", mf.SourceCodePath))
-	sourceBytes, err := os.ReadFile(mf.SourceCodePath)
+
+	if !filepath.IsLocal(mf.SourceCodePath) {
+		return "", invalidManifestErr(fmt.Sprintf("sourceCodePath '%s' must be a relative path inside the worker directory", mf.SourceCodePath))
+	}
+
+	root, err := os.OpenRoot(".")
 	if err != nil {
+		return "", err
+	}
+	defer func() { _ = root.Close() }()
+
+	sourceBytes, err := root.ReadFile(mf.SourceCodePath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return "", invalidManifestErr(fmt.Sprintf("cannot read sourceCodePath '%s': %v", mf.SourceCodePath, err))
+		}
 		return "", err
 	}
 	return string(sourceBytes), nil

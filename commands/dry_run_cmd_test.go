@@ -36,6 +36,15 @@ func TestDryRun(t *testing.T) {
 		fileInput string
 	}{
 		{
+			name:       "fails if source code path escapes the worker directory",
+			serverStub: common.NewServerStub(t),
+			patchManifest: func(mf *model.Manifest) {
+				mf.SourceCodePath = "../outside.ts"
+			},
+			commandArgs: []string{`{}`},
+			assert:      common.AssertOutputError("invalid manifest: sourceCodePath '../outside.ts' must be a relative path inside the worker directory"),
+		},
+		{
 			name: "nominal case",
 			serverStub: common.NewServerStub(t).
 				WithTestEndpoint(
