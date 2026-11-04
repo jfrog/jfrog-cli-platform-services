@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 	"text/template"
 
@@ -17,6 +18,9 @@ import (
 	"github.com/jfrog/jfrog-cli-core/v2/plugins/components"
 	"github.com/jfrog/jfrog-client-go/utils/log"
 )
+
+// tsIdentifierPattern matches a TypeScript identifier, the only form accepted for server-supplied names used in code templates.
+var tsIdentifierPattern = regexp.MustCompile(`^[A-Za-z_$][A-Za-z0-9_$]*$`)
 
 //go:embed templates/*
 var templates embed.FS
@@ -116,6 +120,10 @@ func (c *initHandler) initWorker(targetDir string, action string, workerName str
 		return err
 	}
 
+	if actionMeta.ExecutionRequestType != "" && !tsIdentifierPattern.MatchString(actionMeta.ExecutionRequestType) {
+		return fmt.Errorf("invalid execution request type %q returned by the server for action %q", actionMeta.ExecutionRequestType, action)
+	}
+
 	generate := c.initGenerator(targetDir, workerName, projectKey, force, skipTests, actionMeta)
 
 	if err := generate("package.json_template", "package.json"); err != nil {
@@ -203,7 +211,7 @@ func (c *initHandler) initGenerator(targetDir string, workerName string, project
 	}
 
 	return func(templateName, outputFilename string) error {
-		tpl, err := template.New(templateName).ParseFS(templates, "templates/"+templateName)
+		tpl, err := template.New(templateName).Funcs(common.TemplateFuncs).ParseFS(templates, "templates/"+templateName)
 		if err != nil {
 			return err
 		}
