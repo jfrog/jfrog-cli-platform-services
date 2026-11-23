@@ -65,7 +65,7 @@ jobs:
         if: steps.bump.outputs.changed == 'true'
         env:
           WORKER_INIT_OUTPUT_DIR: ${{ runner.temp }}/worker-verify
-        run: go test -tags=test ./commands/... -run TestGenerateWorkableWorker -v -timeout 2m
+        run: go test -tags=test ./commands -run TestGenerateWorkableWorker -v -timeout 2m
 
       - name: Verify the generated worker installs, type-checks and tests pass
         if: steps.bump.outputs.changed == 'true'
